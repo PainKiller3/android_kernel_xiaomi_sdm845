@@ -756,14 +756,14 @@ static void tcp_tasklet_func(unsigned long data)
 	list_for_each_safe(q, n, &list) {
 		tp = list_entry(q, struct tcp_sock, tsq_node);
 		list_del(&tp->tsq_node);
-		clear_bit(TSQ_QUEUED, &tp->tsq_flags);
 
 		sk = (struct sock *)tp;
+		clear_bit(TSQ_QUEUED, &sk->sk_tsq_flags);
 		if (!sk->sk_lock.owned &&
-		    test_bit(TCP_TSQ_DEFERRED, &tp->tsq_flags)) {
+		    test_bit(TCP_TSQ_DEFERRED, &sk->sk_tsq_flags)) {
 			bh_lock_sock(sk);
 			if (!sock_owned_by_user(sk)) {
-				clear_bit(TCP_TSQ_DEFERRED, &tp->tsq_flags);
+				clear_bit(TCP_TSQ_DEFERRED, &sk->sk_tsq_flags);
 				tcp_tsq_handler(sk);
 			}
 			bh_unlock_sock(sk);
@@ -866,7 +866,7 @@ void tcp_wfree(struct sk_buff *skb)
 	if (wmem >= SKB_TRUESIZE(1) && this_cpu_ksoftirqd() == current)
 		goto out;
 
-	for (oval = READ_ONCE(tp->tsq_flags);; oval = nval) {
+	for (oval = READ_ONCE(sk->sk_tsq_flags);; oval = nval) {
 		struct tsq_tasklet *tsq;
 		bool empty;
 
@@ -874,7 +874,7 @@ void tcp_wfree(struct sk_buff *skb)
 			goto out;
 
 		nval = (oval & ~TSQF_THROTTLED) | TSQF_QUEUED | TCPF_TSQ_DEFERRED;
-		nval = cmpxchg(&tp->tsq_flags, oval, nval);
+		nval = cmpxchg(&sk->sk_tsq_flags, oval, nval);
 		if (nval != oval)
 			continue;
 
@@ -2201,7 +2201,7 @@ static bool tcp_small_queue_check(struct sock *sk, const struct sk_buff *skb,
 		    skb->prev == sk->sk_write_queue.next)
 			return false;
 
-		set_bit(TSQ_THROTTLED, &tcp_sk(sk)->tsq_flags);
+		set_bit(TSQ_THROTTLED, &sk->sk_tsq_flags);
 		/* It is possible TX completion already happened
 		 * before we set TSQ_THROTTLED, so we must
 		 * test again the condition.
@@ -2303,8 +2303,8 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 		    unlikely(tso_fragment(sk, skb, limit, mss_now, gfp)))
 			break;
 
-		if (test_bit(TCP_TSQ_DEFERRED, &tp->tsq_flags))
-			clear_bit(TCP_TSQ_DEFERRED, &tp->tsq_flags);
+		if (test_bit(TCP_TSQ_DEFERRED, &sk->sk_tsq_flags))
+			clear_bit(TCP_TSQ_DEFERRED, &sk->sk_tsq_flags);
 		if (tcp_small_queue_check(sk, skb, 0))
 			break;
 
