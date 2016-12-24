@@ -81,7 +81,7 @@
 #include <net/rose.h>
 #include <net/6lowpan.h>
 
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 
 /* Uncomment to enable debugging */
 /* #define TUN_DEBUG 1 */
