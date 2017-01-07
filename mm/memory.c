@@ -3557,7 +3557,7 @@ static int do_fault(struct fault_env *fe)
 		ret = VM_FAULT_SIGBUS;
 	else if (!(fe->flags & FAULT_FLAG_WRITE))
 		ret = do_read_fault(fe, pgoff);
-	else if (!(fe->vma_flags & VM_SHARED))
+	else if (!(vma->vm_flags & VM_SHARED))
 		ret = do_cow_fault(fe, pgoff);
 	else
 		ret = do_shared_fault(fe, pgoff);
