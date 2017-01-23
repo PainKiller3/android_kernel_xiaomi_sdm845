@@ -109,7 +109,7 @@ static bool udp_new(struct nf_conn *ct, const struct sk_buff *skb,
 }
 
 static int udp_error(struct net *net, struct nf_conn *tmpl, struct sk_buff *skb,
-		     unsigned int dataoff, enum ip_conntrack_info *ctinfo,
+		     unsigned int dataoff,
 		     u_int8_t pf,
 		     unsigned int hooknum)
 {
