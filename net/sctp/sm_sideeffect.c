@@ -723,7 +723,7 @@ static void sctp_cmd_transport_on(sctp_cmd_seq_t *cmds,
 	 * forward progress.
 	 */
 	if (t->dst)
-		dst_confirm(t->dst);
+		sctp_transport_dst_confirm(t);
 
 	/* The receiver of the HEARTBEAT ACK should also perform an
 	 * RTT measurement for that destination transport address
