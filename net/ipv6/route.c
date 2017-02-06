@@ -1378,6 +1378,7 @@ static bool rt6_cache_allowed_for_pmtu(const struct rt6_info *rt)
 static void __ip6_rt_update_pmtu(struct dst_entry *dst, const struct sock *sk,
 				 const struct ipv6hdr *iph, u32 mtu)
 {
+	const struct in6_addr *daddr, *saddr;
 	struct rt6_info *rt6 = (struct rt6_info *)dst;
 
 	/* Note: do *NOT* check dst_metric_locked(dst, RTAX_MTU)
@@ -1385,26 +1386,26 @@ static void __ip6_rt_update_pmtu(struct dst_entry *dst, const struct sock *sk,
 	 * [see also comment in rt6_mtu_change_route()]
 	 */
 
-	dst_confirm(dst);
+	if (iph) {
+		daddr = &iph->daddr;
+		saddr = &iph->saddr;
+	} else if (sk) {
+		daddr = &sk->sk_v6_daddr;
+		saddr = &inet6_sk(sk)->saddr;
+	} else {
+		daddr = NULL;
+		saddr = NULL;
+	}
+	dst_confirm_neigh(dst, daddr);
 	mtu = max_t(u32, mtu, IPV6_MIN_MTU);
 	if (mtu >= dst_mtu(dst))
 		return;
 
 	if (!rt6_cache_allowed_for_pmtu(rt6)) {
 		rt6_do_update_pmtu(rt6, mtu);
-	} else {
-		const struct in6_addr *daddr, *saddr;
+	} else if (daddr) {
 		struct rt6_info *nrt6;
 
-		if (iph) {
-			daddr = &iph->daddr;
-			saddr = &iph->saddr;
-		} else if (sk) {
-			daddr = &sk->sk_v6_daddr;
-			saddr = &inet6_sk(sk)->saddr;
-		} else {
-			return;
-		}
 		nrt6 = ip6_rt_cache_alloc(rt6, daddr, saddr);
 		if (nrt6) {
 			rt6_do_update_pmtu(nrt6, mtu);
@@ -2281,7 +2282,7 @@ static void rt6_do_redirect(struct dst_entry *dst, struct sock *sk, struct sk_bu
 	 * Look, redirects are sent only in response to data packets,
 	 * so that this nexthop apparently is reachable. --ANK
 	 */
-	dst_confirm(&rt->dst);
+	dst_confirm_neigh(&rt->dst, &ipv6_hdr(skb)->saddr);
 
 	neigh = __neigh_lookup(&nd_tbl, &msg->target, skb->dev, 1);
 	if (!neigh)
