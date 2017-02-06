@@ -415,6 +415,7 @@ int sctp_packet_transmit(struct sctp_packet *packet, gfp_t gfp)
 	int err = 0;
 	int padding;		/* How much padding do we need?  */
 	int pkt_size;
+	int confirm;
 	__u8 has_data = 0;
 	int gso = 0;
 	int pktcount = 0;
@@ -728,7 +729,14 @@ int sctp_packet_transmit(struct sctp_packet *packet, gfp_t gfp)
 		rcu_read_unlock();
 	}
 	head->ignore_df = packet->ipfragok;
-	tp->af_specific->sctp_xmit(head, tp);
+	confirm = tp->dst_pending_confirm;
+	if (confirm)
+		skb_set_dst_pending_confirm(head, 1);
+	/* neighbour should be confirmed on successful transmission or
+	 * positive error
+	 */
+	if (tp->af_specific->sctp_xmit(head, tp) >= 0 && confirm)
+		tp->dst_pending_confirm = 0;
 	goto out;
 
 nomem:
