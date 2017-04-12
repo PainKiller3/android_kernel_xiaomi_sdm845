@@ -361,7 +361,7 @@ static int hsr_get_node_status(struct sk_buff *skb_in, struct genl_info *info)
 rcu_unlock:
 	rcu_read_unlock();
 invalid:
-	netlink_ack(skb_in, nlmsg_hdr(skb_in), -EINVAL);
+	netlink_ack(skb_in, nlmsg_hdr(skb_in), -EINVAL, NULL);
 	return 0;
 
 nla_put_failure:
@@ -452,7 +452,7 @@ restart:
 rcu_unlock:
 	rcu_read_unlock();
 invalid:
-	netlink_ack(skb_in, nlmsg_hdr(skb_in), -EINVAL);
+	netlink_ack(skb_in, nlmsg_hdr(skb_in), -EINVAL, NULL);
 	return 0;
 
 nla_put_failure:
