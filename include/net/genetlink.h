@@ -75,6 +75,7 @@ struct genl_family {
  * @attrs: netlink attributes
  * @_net: network namespace
  * @user_ptr: user pointers
+ * @extack: extended ACK report struct
  */
 struct genl_info {
 	u32			snd_seq;
@@ -85,6 +86,7 @@ struct genl_info {
 	struct nlattr **	attrs;
 	possible_net_t		_net;
 	void *			user_ptr[2];
+	struct netlink_ext_ack *extack;
 };
 
 static inline struct net *genl_info_net(struct genl_info *info)
@@ -95,6 +97,16 @@ static inline struct net *genl_info_net(struct genl_info *info)
 static inline void genl_info_net_set(struct genl_info *info, struct net *net)
 {
 	write_pnet(&info->_net, net);
+}
+
+#define GENL_SET_ERR_MSG(info, msg) NL_SET_ERR_MSG((info)->extack, msg)
+
+static inline int genl_err_attr(struct genl_info *info, int err,
+				struct nlattr *attr)
+{
+	info->extack->bad_attr = attr;
+
+	return err;
 }
 
 /**
