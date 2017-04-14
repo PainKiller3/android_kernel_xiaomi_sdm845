@@ -434,6 +434,35 @@ static unsigned long do_shrink_slab(struct shrink_control *shrinkctl,
 	return freed;
 }
 
+static void shrink_slab_lmk(gfp_t gfp_mask, int nid,
+				 struct mem_cgroup *memcg,
+				 unsigned long nr_scanned,
+				 unsigned long nr_eligible)
+{
+	struct shrinker *shrinker;
+
+	if (nr_scanned == 0)
+		nr_scanned = SWAP_CLUSTER_MAX;
+
+	if (!down_read_trylock(&shrinker_rwsem))
+		goto out;
+
+	list_for_each_entry(shrinker, &shrinker_list, list) {
+		struct shrink_control sc = {
+			.gfp_mask = gfp_mask,
+		};
+
+		if (!(shrinker->flags & SHRINKER_LMK))
+			continue;
+
+		do_shrink_slab(&sc, shrinker, nr_scanned, nr_eligible);
+	}
+
+	up_read(&shrinker_rwsem);
+out:
+	cond_resched();
+}
+
 /**
  * shrink_slab - shrink slab caches
  * @gfp_mask: allocation context
@@ -493,6 +522,9 @@ static unsigned long shrink_slab(gfp_t gfp_mask, int nid,
 			.nid = nid,
 			.memcg = memcg,
 		};
+
+		if (shrinker->flags & SHRINKER_LMK)
+			continue;
 
 		/*
 		 * If kernel memory accounting is disabled, we ignore
@@ -2750,6 +2782,7 @@ static void shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
 	unsigned long nr_soft_scanned;
 	gfp_t orig_mask;
 	pg_data_t *last_pgdat = NULL;
+	unsigned long lru_pages = 0;
 
 	/*
 	 * If the number of buffer_heads in the machine exceeds the maximum
@@ -2769,6 +2802,7 @@ static void shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
 		 * to global LRU.
 		 */
 		if (global_reclaim(sc)) {
+			lru_pages += zone_reclaimable_pages(zone);
 			if (!cpuset_zone_allowed(zone,
 						 GFP_KERNEL | __GFP_HARDWALL))
 				continue;
@@ -2820,6 +2854,9 @@ static void shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
 		shrink_node(zone->zone_pgdat, sc);
 	}
 
+	if (global_reclaim(sc))
+		shrink_slab_lmk(sc->gfp_mask, 0, NULL,
+				sc->nr_scanned, lru_pages);
 	/*
 	 * Restore to original mask to avoid the impact on the caller if we
 	 * promoted it to __GFP_HIGHMEM.
@@ -3254,7 +3291,8 @@ static bool prepare_kswapd_sleep(pg_data_t *pgdat, int order, int classzone_idx)
  * This is used to determine if the scanning priority needs to be raised.
  */
 static bool kswapd_shrink_node(pg_data_t *pgdat,
-			       struct scan_control *sc)
+			       struct scan_control *sc,
+			       unsigned long lru_pages)
 {
 	struct zone *zone;
 	int z;
@@ -3274,6 +3312,8 @@ static bool kswapd_shrink_node(pg_data_t *pgdat,
 	 * now pressure is applied based on node LRU order.
 	 */
 	shrink_node(pgdat, sc);
+	shrink_slab_lmk(sc->gfp_mask, zone_to_nid(zone), NULL,
+			sc->nr_scanned, lru_pages);
 
 	/*
 	 * Fragmentation may mean that the system cannot be rebalanced for
@@ -3323,6 +3363,7 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 	do {
 		unsigned long nr_reclaimed = sc.nr_reclaimed;
 		bool raise_priority = true;
+		unsigned long lru_pages = 0;
 
 		sc.reclaim_idx = classzone_idx;
 
@@ -3370,6 +3411,15 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 		if (sc.priority < DEF_PRIORITY - 2)
 			sc.may_writepage = 1;
 
+		for (i = 0; i <= classzone_idx; i++) {
+			zone = pgdat->node_zones + i;
+
+			if (!populated_zone(zone))
+				continue;
+
+			lru_pages += zone_reclaimable_pages(zone);
+		}
+
 		/* Call soft limit reclaim before calling shrink_node. */
 		sc.nr_scanned = 0;
 		nr_soft_scanned = 0;
@@ -3382,7 +3432,7 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 		 * enough pages are already being scanned that that high
 		 * watermark would be met at 100% efficiency.
 		 */
-		if (kswapd_shrink_node(pgdat, &sc))
+		if (kswapd_shrink_node(pgdat, &sc, lru_pages))
 			raise_priority = false;
 
 		/*
