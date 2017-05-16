@@ -1004,6 +1004,7 @@ static int __tcp_transmit_skb(struct sock *sk, struct sk_buff *skb,
 	BUG_ON(!skb || !tcp_skb_pcount(skb));
 	tp = tcp_sk(sk);
 
+	skb->skb_mstamp = tp->tcp_mstamp;
 	if (clone_it) {
 		TCP_SKB_CB(skb)->tx.in_flight = TCP_SKB_CB(skb)->end_seq
 			- tp->snd_una;
@@ -1930,7 +1931,6 @@ static bool tcp_tso_should_defer(struct sock *sk, struct sk_buff *skb,
 	const struct inet_connection_sock *icsk = inet_csk(sk);
 	u32 age, send_win, cong_win, limit, in_flight;
 	struct tcp_sock *tp = tcp_sk(sk);
-	struct skb_mstamp now;
 	struct sk_buff *head;
 	int win_divisor;
 
@@ -1986,8 +1986,8 @@ static bool tcp_tso_should_defer(struct sock *sk, struct sk_buff *skb,
 	}
 
 	head = tcp_write_queue_head(sk);
-	skb_mstamp_get(&now);
-	age = skb_mstamp_us_delta(&now, &head->skb_mstamp);
+
+	age = skb_mstamp_us_delta(&tp->tcp_mstamp, &head->skb_mstamp);
 	/* If next ACK is likely to come too late (half srtt), do not defer */
 	if (age < (tp->srtt_us >> 4))
 		goto send_now;
@@ -2331,6 +2331,7 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 	}
 
 	max_segs = tcp_tso_segs(sk, mss_now);
+	skb_mstamp_get(&tp->tcp_mstamp);
 	while ((skb = tcp_send_head(sk))) {
 		unsigned int limit;
 
@@ -2342,7 +2343,7 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 
 		if (unlikely(tp->repair) && tp->repair_queue == TCP_SEND_QUEUE) {
 			/* "skb_mstamp" is used as a start point for the retransmit timer */
-			skb_mstamp_get(&skb->skb_mstamp);
+			skb->skb_mstamp = tp->tcp_mstamp;
 			goto repair; /* Skip network transmission */
 		}
 
@@ -2953,6 +2954,7 @@ int __tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb, int segs)
 		     skb_headroom(skb) >= 0xFFFF)) {
 		struct sk_buff *nskb;
 
+		skb->skb_mstamp = tp->tcp_mstamp;
 		nskb = __pskb_copy(skb, MAX_TCP_HEADER, GFP_ATOMIC);
 		err = nskb ? tcp_transmit_skb(sk, nskb, 0, GFP_ATOMIC) :
 			     -ENOBUFS;
@@ -3168,7 +3170,7 @@ void tcp_send_active_reset(struct sock *sk, gfp_t priority)
 	skb_reserve(skb, MAX_TCP_HEADER);
 	tcp_init_nondata_skb(skb, tcp_acceptable_seq(sk),
 			     TCPHDR_ACK | TCPHDR_RST);
-	skb_mstamp_get(&skb->skb_mstamp);
+	skb_mstamp_get(&tcp_sk(sk)->tcp_mstamp);
 	/* Send it off. */
 	if (tcp_transmit_skb(sk, skb, 0, priority))
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPABORTFAILED);
@@ -3537,7 +3539,8 @@ int tcp_connect(struct sock *sk)
 		return -ENOBUFS;
 
 	tcp_init_nondata_skb(buff, tp->write_seq++, TCPHDR_SYN);
-	tp->retrans_stamp = tcp_time_stamp;
+	skb_mstamp_get(&tp->tcp_mstamp);
+	tp->retrans_stamp = tp->tcp_mstamp.stamp_jiffies;
 	tcp_connect_queue_skb(sk, buff);
 	tcp_ecn_send_syn(sk, buff);
 
@@ -3657,7 +3660,6 @@ void __tcp_send_ack(struct sock *sk, u32 rcv_nxt)
 	skb_set_tcp_pure_ack(buff);
 
 	/* Send it off, this clears delayed acks for us. */
-	skb_mstamp_get(&buff->skb_mstamp);
 	__tcp_transmit_skb(sk, buff, 0, (__force gfp_t)0, rcv_nxt);
 }
 EXPORT_SYMBOL_GPL(__tcp_send_ack);
@@ -3696,15 +3698,16 @@ static int tcp_xmit_probe_skb(struct sock *sk, int urgent, int mib)
 	 * send it.
 	 */
 	tcp_init_nondata_skb(skb, tp->snd_una - !urgent, TCPHDR_ACK);
-	skb_mstamp_get(&skb->skb_mstamp);
 	NET_INC_STATS(sock_net(sk), mib);
 	return tcp_transmit_skb(sk, skb, 0, (__force gfp_t)0);
 }
 
+/* Called from setsockopt( ... TCP_REPAIR ) */
 void tcp_send_window_probe(struct sock *sk)
 {
 	if (sk->sk_state == TCP_ESTABLISHED) {
 		tcp_sk(sk)->snd_wl1 = tcp_sk(sk)->rcv_nxt - 1;
+		skb_mstamp_get(&tcp_sk(sk)->tcp_mstamp);
 		tcp_xmit_probe_skb(sk, 0, LINUX_MIB_TCPWINPROBE);
 	}
 }
