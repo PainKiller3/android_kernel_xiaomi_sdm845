@@ -2321,13 +2321,13 @@ repair:
 
 		/* Send one loss probe per tail loss episode. */
 		if (push_one != 2)
-			tcp_schedule_loss_probe(sk);
+			tcp_schedule_loss_probe(sk, false);
 		return false;
 	}
 	return !tp->packets_out && tcp_send_head(sk);
 }
 
-bool tcp_schedule_loss_probe(struct sock *sk)
+bool tcp_schedule_loss_probe(struct sock *sk, bool advancing_rto)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
@@ -2366,7 +2366,9 @@ bool tcp_schedule_loss_probe(struct sock *sk)
 	}
 
 	/* If the RTO formula yields an earlier time, then use that time. */
-	rto_delta_us = tcp_rto_delta_us(sk);  /* How far in future is RTO? */
+	rto_delta_us = advancing_rto ?
+			jiffies_to_usecs(inet_csk(sk)->icsk_rto) :
+			tcp_rto_delta_us(sk);  /* How far in future is RTO? */
 	if (rto_delta_us > 0)
 		timeout = min_t(u32, timeout, usecs_to_jiffies(rto_delta_us));
 
