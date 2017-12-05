@@ -159,7 +159,7 @@ static void print_wakeup_sources(void)
 	const struct list_head *wakeups;
 
 	if (suspend_abort) {
-		pr_info("Abort: %s", abort_reason);
+		pr_info("Abort: %s\n", abort_reason);
 		return;
 	}
 
