@@ -85,6 +85,7 @@ static int __init ipc_init(void)
 {
 	sem_init();
 	msg_init();
+	proc_mkdir("sysvipc", NULL);
 	shm_init();
 	return 0;
 }
