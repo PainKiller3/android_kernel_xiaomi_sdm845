@@ -876,6 +876,7 @@
 		polling-delay = <0>;
 		thermal-sensors = <&pmi8998_tz>;
 		wake-capable-sensor;
+		disable-thermal-zone;
 
 		trips {
 			pmi8998_trip0: pmi8998-trip0 {
