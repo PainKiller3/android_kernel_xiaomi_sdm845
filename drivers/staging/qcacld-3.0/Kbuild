@@ -1655,6 +1655,7 @@ OBJS +=		$(DP_OBJS)
 endif
 
 ccflags-y += $(INCS)
+subdir-ccflags-y := $(call cc-disable-warning, misleading-indentation)
 
 cppflags-y +=	-DANI_OS_TYPE_ANDROID=6 \
 		-Wall\
