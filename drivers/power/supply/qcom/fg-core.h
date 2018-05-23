@@ -288,6 +288,7 @@ struct fg_dt_props {
 	bool	hold_soc_while_full;
 	bool	linearize_soc;
 	bool	auto_recharge_soc;
+	bool	soc_irq_disable;
 	bool	use_esr_sw;
 	bool	disable_esr_pull_dn;
 	bool	disable_fg_twm;
