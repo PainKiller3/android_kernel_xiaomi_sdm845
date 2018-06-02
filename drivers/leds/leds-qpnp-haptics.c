@@ -360,6 +360,8 @@ struct hap_chip {
 	bool				auto_res_err_recovery_hw;
 };
 
+struct hap_chip *gchip;
+
 static int qpnp_haptics_parse_buffer_dt(struct hap_chip *chip);
 static int qpnp_haptics_parse_pwm_dt(struct hap_chip *chip);
 
@@ -1313,6 +1315,34 @@ static int qpnp_haptics_auto_mode_config(struct hap_chip *chip, int time_ms)
 		return rc;
 
 	return 0;
+}
+
+void set_vibrate(int val)
+{
+	int rc;
+
+	if (val > gchip->max_play_time_ms)
+		return;
+
+	mutex_lock(&gchip->param_lock);
+	rc = qpnp_haptics_auto_mode_config(gchip, val);
+	if (rc < 0) {
+		pr_err("Unable to do auto mode config\n");
+		mutex_unlock(&gchip->param_lock);
+		return;
+	}
+
+	gchip->play_time_ms = val;
+	mutex_unlock(&gchip->param_lock);
+
+	hrtimer_cancel(&gchip->stop_timer);
+	if (is_sw_lra_auto_resonance_control(gchip))
+		hrtimer_cancel(&gchip->auto_res_err_poll_timer);
+	cancel_work_sync(&gchip->haptics_work);
+
+	atomic_set(&gchip->state, 1);
+	schedule_work(&gchip->haptics_work);
+
 }
 
 static irqreturn_t qpnp_haptics_play_irq_handler(int irq, void *data)
@@ -2646,6 +2676,8 @@ static int qpnp_haptics_remove(struct platform_device *pdev)
 	if (chip->pwm_data.pwm_dev)
 		pwm_put(chip->pwm_data.pwm_dev);
 	dev_set_drvdata(&pdev->dev, NULL);
+
+	gchip = chip;
 
 	return 0;
 }
