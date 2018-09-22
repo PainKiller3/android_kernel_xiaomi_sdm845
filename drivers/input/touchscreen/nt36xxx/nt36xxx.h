@@ -113,7 +113,7 @@ struct nvt_ts_data {
 	struct pinctrl *ts_pinctrl;
 	struct pinctrl_state *pinctrl_state_active;
 	struct pinctrl_state *pinctrl_state_suspend;
-
+	struct attribute_group attrs;
 	struct regulator *vddio_reg;
 	struct regulator *lab_reg;
 	struct regulator *ibb_reg;
@@ -160,7 +160,8 @@ struct nvt_ts_data {
 	int gesture_enabled;
 #endif
 	int current_index;
-	struct pm_qos_request pm_qos_req;
+	struct pm_qos_request pm_qos_req; 
+	struct proc_dir_entry *input_proc; 
 };
 
 #if WAKEUP_GESTURE
