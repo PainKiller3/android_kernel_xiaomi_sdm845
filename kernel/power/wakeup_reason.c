@@ -303,11 +303,11 @@ static inline void stop_logging_wakeup_reasons(void)
  */
 void log_base_wakeup_reason(int irq)
 {
-	/* No locking is needed, since this function is called within
-	 * syscore_resume, with both nonboot CPUs and interrupts disabled.
-	 */
+	unsigned long flags;
+	spin_lock_irqsave(&resume_reason_lock, flags);
 	base_irq_nodes = add_to_siblings(base_irq_nodes, irq);
 	BUG_ON(!base_irq_nodes);
+	spin_unlock_irqrestore(&resume_reason_lock, flags);
 }
 
 /* This function is called by generic_handle_irq, which may call itself
