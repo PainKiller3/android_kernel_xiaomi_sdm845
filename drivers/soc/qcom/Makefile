@@ -39,7 +39,10 @@ obj-$(CONFIG_QCOM_SECURE_BUFFER) += secure_buffer.o
 obj-$(CONFIG_MSM_SMEM) += msm_smem.o
 obj-$(CONFIG_DEBUG_KERNEL) += smem_debug.o rpm-smd-debug.o smp2p_debug.o smd_debug.o
 obj-$(CONFIG_MSM_SMD)	+= msm_smd.o smd_private.o smd_init_dt.o smsm_debug.o
-obj-$(CONFIG_MSM_GLINK) += glink.o glink_debugfs.o glink_ssr.o
+obj-$(CONFIG_MSM_GLINK) += glink.o glink_ssr.o
+ifdef CONFIG_DEBUG_FS
+obj-$(CONFIG_MSM_GLINK) += glink_debugfs.o
+endif
 obj-$(CONFIG_MSM_TZ_SMMU) += msm_tz_smmu.o
 obj-$(CONFIG_MSM_GLINK_LOOPBACK_SERVER) += glink_loopback_server.o
 obj-$(CONFIG_MSM_GLINK_BGCOM_XPRT) += glink_bgcom_xprt.o
