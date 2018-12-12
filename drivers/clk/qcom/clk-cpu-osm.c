@@ -97,6 +97,7 @@ struct clk_osm {
 	u32 prev_cycle_counter;
 	u32 max_core_count;
 	u32 mx_turbo_freq;
+	cpumask_t related_cpus;
 };
 
 static bool is_sdm845v1;
@@ -681,7 +682,7 @@ static struct clk_osm *osm_configure_policy(struct cpufreq_policy *policy)
 		if (parent != c_parent)
 			continue;
 
-		cpumask_set_cpu(cpu, policy->cpus);
+		cpumask_set_cpu(cpu, &c->related_cpus);
 		if (n->core_num == 0)
 			first = n;
 	}
@@ -815,6 +816,9 @@ static int osm_cpufreq_cpu_init(struct cpufreq_policy *policy)
 	}
 
 	policy->driver_data = c;
+
+	cpumask_copy(policy->cpus, &c->related_cpus);
+
 	return 0;
 
 err:
