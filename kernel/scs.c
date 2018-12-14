@@ -50,6 +50,11 @@ void scs_task_init(struct task_struct *tsk)
 	task_set_scs(tsk, NULL);
 }
 
+void scs_task_reset(struct task_struct *tsk)
+{
+	task_set_scs(tsk, __scs_base(tsk));
+}
+
 void scs_set_init_magic(struct task_struct *tsk)
 {
 	scs_save(tsk);
