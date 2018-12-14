@@ -226,7 +226,7 @@ void ath9k_htc_reset(struct ath9k_htc_priv *priv)
 	WMI_CMD_BUF(WMI_SET_MODE_CMDID, &htc_mode);
 
 	WMI_CMD(WMI_ENABLE_INTR_CMDID);
-	htc_start(priv->htc);
+	ath9k_htc_start(priv->htc);
 	ath9k_htc_vif_reconfig(priv);
 	ieee80211_wake_queues(priv->hw);
 
@@ -302,7 +302,7 @@ static int ath9k_htc_set_channel(struct ath9k_htc_priv *priv,
 	if (ret)
 		goto err;
 
-	htc_start(priv->htc);
+	ath9k_htc_start(priv->htc);
 
 	if (!test_bit(ATH_OP_SCANNING, &common->op_flags) &&
 	    !(hw->conf.flags & IEEE80211_CONF_OFFCHANNEL))
@@ -904,7 +904,7 @@ fail_tx:
 	dev_kfree_skb_any(skb);
 }
 
-static int ath9k_htc_start(struct ieee80211_hw *hw)
+static int ath9k_htc_start_drv(struct ieee80211_hw *hw)
 {
 	struct ath9k_htc_priv *priv = hw->priv;
 	struct ath_hw *ah = priv->ah;
@@ -955,7 +955,7 @@ static int ath9k_htc_start(struct ieee80211_hw *hw)
 			"Failed to update capability in target\n");
 
 	clear_bit(ATH_OP_INVALID, &common->op_flags);
-	htc_start(priv->htc);
+	ath9k_htc_start(priv->htc);
 
 	spin_lock_bh(&priv->tx.tx_lock);
 	priv->tx.flags &= ~ATH9K_HTC_OP_TX_QUEUES_STOP;
@@ -973,7 +973,7 @@ static int ath9k_htc_start(struct ieee80211_hw *hw)
 	return ret;
 }
 
-static void ath9k_htc_stop(struct ieee80211_hw *hw)
+static void ath9k_htc_stop_drv(struct ieee80211_hw *hw)
 {
 	struct ath9k_htc_priv *priv = hw->priv;
 	struct ath_hw *ah = priv->ah;
@@ -1864,8 +1864,8 @@ static void ath9k_htc_channel_switch_beacon(struct ieee80211_hw *hw,
 
 struct ieee80211_ops ath9k_htc_ops = {
 	.tx                 = ath9k_htc_tx,
-	.start              = ath9k_htc_start,
-	.stop               = ath9k_htc_stop,
+	.start              = ath9k_htc_start_drv,
+	.stop               = ath9k_htc_stop_drv,
 	.add_interface      = ath9k_htc_add_interface,
 	.remove_interface   = ath9k_htc_remove_interface,
 	.config             = ath9k_htc_config,
