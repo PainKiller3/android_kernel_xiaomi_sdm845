@@ -19,7 +19,7 @@ ghash-ce-y := ghash-ce-glue.o ghash-ce-core.o
 
 obj-$(CONFIG_CRYPTO_AES_ARM64_CE) += aes-ce-cipher.o
 aes-ce-cipher-y := aes-ce-cipher-glue.o aes-ce-cipher-core.o
-CFLAGS_aes-ce-cipher-core.o += -march=armv8.2-a+crypto -Wa,-march=armv8.2-a+crypto $(DISABLE_LTO)
+CFLAGS_aes-ce-cipher-core.o += -march=armv8.2-a+crypto -Wa,-march=armv8.2-a+crypto $(DISABLE_LTO) $(call cc-option,-no-integrated-as)
 
 ifeq ($(cc-name),gcc)
         CFLAGS_aes-ce-cipher-core.o += $(call cc-ifversion, -lt, 0800, -mcpu=cortex-a73.cortex-a53 -mtune=cortex-a73.cortex-a53)
