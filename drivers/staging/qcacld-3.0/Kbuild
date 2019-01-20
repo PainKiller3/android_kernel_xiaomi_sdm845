@@ -3286,6 +3286,8 @@ cppflags-$(CONFIG_IPA_SET_RESET_TX_DB_PA) += -DIPA_SET_RESET_TX_DB_PA
 KBUILD_CPPFLAGS += $(cppflags-y)
 
 ccflags-y += -Wmissing-prototypes
+ccflags-y += -Os
+ccflags-y += -g0
 
 ifeq ($(call cc-option-yn, -Wheader-guard), y)
 ccflags-y += -Wheader-guard
@@ -3338,6 +3340,9 @@ ifeq ($(findstring arm, $(ARCH)),)
 else
 	ccflags-y += -DWLAN_HOST_ARCH_ARM=1
 endif
+
+ccflags-y += $(call cc-option, -g0)
+ccflags-y += $(call cc-option, -Os)
 
 # inject some build related information
 ifeq ($(CONFIG_BUILD_TAG), y)
