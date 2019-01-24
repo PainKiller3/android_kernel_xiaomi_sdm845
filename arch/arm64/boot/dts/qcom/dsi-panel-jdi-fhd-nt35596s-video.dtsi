@@ -67,6 +67,10 @@
 		qcom,mdss-dsi-panel-max-luminance-valid = <0x01 0x01>;
 		qcom,mdss-dsi-panel-bl-info = <408 500 380 620>;
 
+		qcom,ulps-enabled;
+		qcom,suspend-ulps-enabled;
+		qcom,panel-allow-phy-poweroff;
+
 		qcom,mdss-dsi-display-timings {
 			timing@0{
 				qcom,mdss-dsi-panel-framerate = <60>;
