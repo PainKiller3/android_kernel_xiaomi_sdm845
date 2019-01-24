@@ -85,6 +85,10 @@
 		qcom,mdss-dsi-panel-status-read-length = <1 1 1 1 1 1 1>;
 		qcom,mdss-panel-off-keep-reset;
 
+		qcom,ulps-enabled;
+		qcom,suspend-ulps-enabled;
+		qcom,panel-allow-phy-poweroff;
+
 		qcom,mdss-dsi-display-timings {
 			timing@0{
 				qcom,mdss-dsi-panel-framerate = <60>;
