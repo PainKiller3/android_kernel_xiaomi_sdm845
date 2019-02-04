@@ -46,12 +46,6 @@
 		qcom,mdss-pan-physical-height-dimension = <147>;
 		qcom,mdss-dsi-tx-eot-append;
 
-		qcom,mdss-dsi-panel-hdr-enabled;
-		qcom,mdss-dsi-panel-hdr-color-primaries = <14500 15500 32000
-			17000 15500 30000 8000 3000>;
-		qcom,mdss-dsi-panel-peak-brightness = <4300000>;
-		qcom,mdss-dsi-panel-blackness-level = <3230>;
-
 		qcom,mdss-dsi-bl-dcs-type-ss;
 		/* qcom,mdss-dsi-on-command-tuning; */
 		/* qcom,dispparam-enabled; */
