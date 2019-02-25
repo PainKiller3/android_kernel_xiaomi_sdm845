@@ -154,3 +154,8 @@ config DRM_SDE_XLOG_DEBUG
 	default n
 	depends on DRM_MSM
 
+config KLAPSE
+	bool CONFIG_KLAPSE
+	depends on DRM_MSM
+	help
+	  A simple dynamic RGB lapsing module similar to LineageOS' LiveDisplay.
