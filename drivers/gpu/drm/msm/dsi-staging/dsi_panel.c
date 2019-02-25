@@ -32,6 +32,10 @@
 #include <drm/drm_notifier.h>
 #include <soc/qcom/socinfo.h>
 
+#ifdef CONFIG_KLAPSE
+#include "../sde/klapse.h"
+#endif
+
 /**
  * topology is currently defined by a set of following 3 values:
  * 1. num of layer mixers
@@ -1003,6 +1007,10 @@ int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
 		panel->hist_bl_offset = 0;
 
 	mutex_unlock(&panel->panel_lock);
+
+#ifdef CONFIG_KLAPSE
+	set_rgb_slider(bl_lvl);
+#endif
 
 	return rc;
 }
