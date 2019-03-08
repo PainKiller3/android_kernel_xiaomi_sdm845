@@ -155,7 +155,7 @@ config DRM_SDE_XLOG_DEBUG
 	depends on DRM_MSM
 
 config KLAPSE
-	bool CONFIG_KLAPSE
+	bool "KLapse dynamic RGB scaling module"
 	depends on DRM_MSM
 	help
 	  A simple dynamic RGB lapsing module similar to LineageOS' LiveDisplay.
