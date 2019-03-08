@@ -91,5 +91,6 @@ const struct list_head*
 get_wakeup_reasons(unsigned long timeout, struct list_head *unfinished);
 
 void clear_wakeup_reasons(void);
+void log_bad_wake_reason(const char *fmt, ...);
 
 #endif /* _LINUX_WAKEUP_REASON_H */
