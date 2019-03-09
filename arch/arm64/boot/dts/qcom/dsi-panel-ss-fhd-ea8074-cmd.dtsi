@@ -61,6 +61,9 @@
 		qcom,mdss-dsi-panel-blackness-level = <3230>;
 		qcom,mdss-dsi-on-command-tuning;
 		qcom,dispparam-enabled;
+		qcom,ulps-enabled;
+		qcom,suspend-ulps-enabled;
+		qcom,panel-allow-phy-poweroff;
 		qcom,disp-doze-lbm-backlight = <10>;
 		qcom,disp-doze-hbm-backlight = <133>;
 		qcom,mdss-dsi-display-timings {
