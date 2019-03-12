@@ -17,7 +17,6 @@
 #include <linux/delay.h>
 #include <linux/console.h>
 #include <linux/io.h>
-#include <linux/ipc_logging.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
@@ -118,15 +117,7 @@
 #define WAIT_XFER_MAX_ITER	(50)
 #define WAIT_XFER_MAX_TIMEOUT_US	(10000)
 #define WAIT_XFER_MIN_TIMEOUT_US	(9000)
-#define IPC_LOG_PWR_PAGES	(6)
-#define IPC_LOG_MISC_PAGES	(10)
-#define IPC_LOG_TX_RX_PAGES	(8)
 #define DATA_BYTES_PER_LINE	(32)
-
-#define IPC_LOG_MSG(ctx, x...) do { \
-	if (ctx) \
-		ipc_log_string(ctx, x); \
-} while (0)
 
 #define DMA_RX_BUF_SIZE		(2048)
 #define UART_CONSOLE_RX_WM	(2)
@@ -171,10 +162,6 @@ struct msm_geni_serial_port {
 	int wakeup_irq;
 	unsigned char wakeup_byte;
 	struct wakeup_source geni_wake;
-	void *ipc_log_tx;
-	void *ipc_log_rx;
-	void *ipc_log_pwr;
-	void *ipc_log_misc;
 	unsigned int cur_baud;
 	int ioctl_count;
 	int edge_count;
@@ -250,22 +237,6 @@ static ssize_t msm_geni_serial_loopback_store(struct device *dev,
 static DEVICE_ATTR(loopback, 0644, msm_geni_serial_loopback_show,
 					msm_geni_serial_loopback_store);
 
-static void dump_ipc(void *ipc_ctx, char *prefix, char *string,
-						u64 addr, int size)
-
-{
-	char buf[DATA_BYTES_PER_LINE * 2];
-	int len = 0;
-
-	if (!ipc_ctx)
-		return;
-	len = min(size, DATA_BYTES_PER_LINE);
-	hex_dump_to_buffer(string, len, DATA_BYTES_PER_LINE, 1, buf,
-						sizeof(buf), false);
-	ipc_log_string(ipc_ctx, "%s[0x%.10x:%d] : %s", prefix,
-					(unsigned int)addr, size, buf);
-}
-
 static bool device_pending_suspend(struct uart_port *uport)
 {
 	int usage_count = atomic_read(&uport->dev->power.usage_count);
@@ -310,7 +281,6 @@ static bool check_transfers_inflight(struct uart_port *uport)
 static void wait_for_transfers_inflight(struct uart_port *uport)
 {
 	int iter = 0;
-	struct msm_geni_serial_port *port = GET_DEV_PORT(uport);
 
 	while (iter < WAIT_XFER_MAX_ITER) {
 		if (check_transfers_inflight(uport)) {
@@ -321,25 +291,11 @@ static void wait_for_transfers_inflight(struct uart_port *uport)
 			break;
 		}
 	}
-	if (check_transfers_inflight(uport)) {
-		u32 geni_status = geni_read_reg_nolog(uport->membase,
-								SE_GENI_STATUS);
-		u32 geni_ios = geni_read_reg_nolog(uport->membase, SE_GENI_IOS);
-		u32 rx_fifo_status = geni_read_reg_nolog(uport->membase,
-							SE_GENI_RX_FIFO_STATUS);
-		u32 rx_dma =
-			geni_read_reg_nolog(uport->membase, SE_DMA_RX_LEN_IN);
-
-		IPC_LOG_MSG(port->ipc_log_misc,
-			"%s IOS 0x%x geni status 0x%x rx: fifo 0x%x dma 0x%x\n",
-		__func__, geni_ios, geni_status, rx_fifo_status, rx_dma);
-	}
 }
 
 static int vote_clock_on(struct uart_port *uport)
 {
 	struct msm_geni_serial_port *port = GET_DEV_PORT(uport);
-	int usage_count;
 	int ret = 0;
 
 	ret = msm_geni_serial_power_on(uport);
@@ -348,18 +304,12 @@ static int vote_clock_on(struct uart_port *uport)
 		return ret;
 	}
 	port->ioctl_count++;
-	usage_count = atomic_read(&uport->dev->power.usage_count);
-	IPC_LOG_MSG(port->ipc_log_pwr,
-		"%s :%s ioctl:%d usage_count:%d edge-Count:%d\n",
-		__func__, current->comm, port->ioctl_count,
-		usage_count, port->edge_count);
 	return 0;
 }
 
 static int vote_clock_off(struct uart_port *uport)
 {
 	struct msm_geni_serial_port *port = GET_DEV_PORT(uport);
-	int usage_count;
 
 	if (!pm_runtime_enabled(uport->dev)) {
 		dev_err(uport->dev, "RPM not available.Can't enable clocks\n");
@@ -368,17 +318,11 @@ static int vote_clock_off(struct uart_port *uport)
 	if (!port->ioctl_count) {
 		dev_warn(uport->dev, "%s:Imbalanced vote off ioctl %d\n",
 						__func__, port->ioctl_count);
-		IPC_LOG_MSG(port->ipc_log_pwr,
-				"%s:Imbalanced vote_off from userspace. %d",
-				__func__, port->ioctl_count);
 		return -EPERM;
 	}
 	wait_for_transfers_inflight(uport);
 	port->ioctl_count--;
 	msm_geni_serial_power_off(uport);
-	usage_count = atomic_read(&uport->dev->power.usage_count);
-	IPC_LOG_MSG(port->ipc_log_pwr, "%s:%s ioctl:%d usage_count:%d\n",
-		__func__, current->comm, port->ioctl_count, usage_count);
 	return 0;
 };
 
@@ -408,12 +352,7 @@ static int msm_geni_serial_ioctl(struct uart_port *uport, unsigned int cmd,
 
 static void msm_geni_serial_break_ctl(struct uart_port *uport, int ctl)
 {
-	struct msm_geni_serial_port *port = GET_DEV_PORT(uport);
-
 	if (!uart_console(uport) && device_pending_suspend(uport)) {
-		IPC_LOG_MSG(port->ipc_log_misc,
-				"%s.Device is suspended, %s\n",
-				__func__, current->comm);
 		return;
 	}
 
@@ -436,12 +375,8 @@ static unsigned int msm_geni_serial_get_mctrl(struct uart_port *uport)
 {
 	u32 geni_ios = 0;
 	unsigned int mctrl = TIOCM_DSR | TIOCM_CAR;
-	struct msm_geni_serial_port *port = GET_DEV_PORT(uport);
 
 	if (!uart_console(uport) && device_pending_suspend(uport)) {
-		IPC_LOG_MSG(port->ipc_log_misc,
-				"%s.Device is suspended, %s\n",
-				__func__, current->comm);
 		return TIOCM_DSR | TIOCM_CAR | TIOCM_CTS;
 	}
 
@@ -464,9 +399,6 @@ static void msm_geni_serial_set_mctrl(struct uart_port *uport,
 	struct msm_geni_serial_port *port = GET_DEV_PORT(uport);
 
 	if (device_pending_suspend(uport)) {
-		IPC_LOG_MSG(port->ipc_log_misc,
-			"%s.Device is suspended, %s: mctrl=0x%x\n",
-			 __func__, current->comm, mctrl);
 		return;
 	}
 	if (!(mctrl & TIOCM_RTS)) {
@@ -479,10 +411,6 @@ static void msm_geni_serial_set_mctrl(struct uart_port *uport,
 							SE_UART_MANUAL_RFR);
 	/* Write to flow control must complete before return to client*/
 	mb();
-	IPC_LOG_MSG(port->ipc_log_misc,
-			"%s:%s, mctrl=0x%x, manual_rfr=0x%x, flow=%s\n",
-			__func__, current->comm, mctrl, uart_manual_rfr,
-			(port->manual_flow ? "OFF" : "ON"));
 }
 
 static const char *msm_geni_serial_get_type(struct uart_port *uport)
@@ -521,7 +449,6 @@ static struct msm_geni_serial_port *get_port_from_line(int line)
 static int msm_geni_serial_power_on(struct uart_port *uport)
 {
 	int ret = 0;
-	struct msm_geni_serial_port *port = GET_DEV_PORT(uport);
 
 	if (!pm_runtime_enabled(uport->dev)) {
 		if (pm_runtime_status_suspended(uport->dev)) {
@@ -529,15 +456,9 @@ static int msm_geni_serial_power_on(struct uart_port *uport)
 			struct tty_port *tport = &state->port;
 			int lock = mutex_trylock(&tport->mutex);
 
-			IPC_LOG_MSG(port->ipc_log_pwr,
-					"%s:Manual resume\n", __func__);
 			pm_runtime_disable(uport->dev);
 			ret = msm_geni_serial_runtime_resume(uport->dev);
-			if (ret) {
-				IPC_LOG_MSG(port->ipc_log_pwr,
-					"%s:Manual RPM CB failed %d\n",
-								__func__, ret);
-			} else {
+			if (!ret) {
 				pm_runtime_get_noresume(uport->dev);
 				pm_runtime_set_active(uport->dev);
 				enable_irq(uport->irq);
@@ -549,7 +470,6 @@ static int msm_geni_serial_power_on(struct uart_port *uport)
 	} else {
 		ret = pm_runtime_get_sync(uport->dev);
 		if (ret < 0) {
-			IPC_LOG_MSG(port->ipc_log_pwr, "%s Err\n", __func__);
 			WARN_ON_ONCE(1);
 			pm_runtime_put_noidle(uport->dev);
 			pm_runtime_set_suspended(uport->dev);
@@ -561,14 +481,11 @@ static int msm_geni_serial_power_on(struct uart_port *uport)
 
 static void msm_geni_serial_power_off(struct uart_port *uport)
 {
-	struct msm_geni_serial_port *port = GET_DEV_PORT(uport);
 	int usage_count = atomic_read(&uport->dev->power.usage_count);
 
-	if (!usage_count) {
-		IPC_LOG_MSG(port->ipc_log_pwr, "%s: Usage Count is already 0\n",
-								__func__);
+	if (!usage_count)
 		return;
-	}
+
 	pm_runtime_mark_last_busy(uport->dev);
 	pm_runtime_put_autosuspend(uport->dev);
 }
@@ -660,7 +577,6 @@ static void msm_geni_serial_abort_rx(struct uart_port *uport)
 static void msm_geni_serial_complete_rx_eot(struct uart_port *uport)
 {
 	int poll_done = 0, tries = 0;
-	struct msm_geni_serial_port *port = GET_DEV_PORT(uport);
 
 	do {
 		poll_done = msm_geni_serial_poll_bit(uport, SE_DMA_RX_IRQ_STAT,
@@ -668,12 +584,7 @@ static void msm_geni_serial_complete_rx_eot(struct uart_port *uport)
 		tries++;
 	} while (!poll_done && tries < 5);
 
-	if (!poll_done)
-		IPC_LOG_MSG(port->ipc_log_misc,
-		"%s: RX_EOT, GENI:0x%x, DMA_DEBUG:0x%x\n", __func__,
-		geni_read_reg_nolog(uport->membase, SE_GENI_STATUS),
-		geni_read_reg_nolog(uport->membase, SE_DMA_DEBUG_REG0));
-	else
+	if (poll_done)
 		geni_write_reg_nolog(RX_EOT, uport->membase, SE_DMA_RX_IRQ_CLR);
 }
 
@@ -923,8 +834,6 @@ static int msm_geni_serial_prep_dma_tx(struct uart_port *uport)
 	if (!xmit_size)
 		return ret;
 
-	dump_ipc(msm_port->ipc_log_tx, "DMA Tx",
-		 (char *)&xmit->buf[xmit->tail], 0, xmit_size);
 	msm_geni_serial_setup_tx(uport, xmit_size);
 	ret = geni_se_tx_dma_prep(msm_port->wrapper_dev, uport->membase,
 			&xmit->buf[xmit->tail], xmit_size, &msm_port->tx_dma);
@@ -944,8 +853,6 @@ static int msm_geni_serial_prep_dma_tx(struct uart_port *uport)
 		}
 		geni_write_reg_nolog(M_CMD_CANCEL_EN, uport->membase,
 							SE_GENI_M_IRQ_CLEAR);
-		IPC_LOG_MSG(msm_port->ipc_log_tx, "%s: DMA map failure %d\n",
-								__func__, ret);
 		msm_port->tx_dma = (dma_addr_t)NULL;
 		msm_port->xmit_size = 0;
 	}
@@ -957,19 +864,13 @@ static void msm_geni_serial_start_tx(struct uart_port *uport)
 	unsigned int geni_m_irq_en;
 	struct msm_geni_serial_port *msm_port = GET_DEV_PORT(uport);
 	unsigned int geni_status;
-	unsigned int geni_ios;
-	static unsigned int ios_log_limit;
 
 	if (!uart_console(uport) && !pm_runtime_active(uport->dev)) {
-		IPC_LOG_MSG(msm_port->ipc_log_misc,
-				"%s.Putting in async RPM vote\n", __func__);
 		pm_runtime_get(uport->dev);
 		goto exit_start_tx;
 	}
 
 	if (!uart_console(uport)) {
-		IPC_LOG_MSG(msm_port->ipc_log_misc,
-				"%s.Power on.\n", __func__);
 		pm_runtime_get(uport->dev);
 	}
 
@@ -1000,12 +901,6 @@ static void msm_geni_serial_start_tx(struct uart_port *uport)
 	}
 	return;
 check_flow_ctrl:
-	geni_ios = geni_read_reg_nolog(uport->membase, SE_GENI_IOS);
-	if (++ios_log_limit % 5 == 0) {
-		IPC_LOG_MSG(msm_port->ipc_log_misc, "%s: ios: 0x%08x\n",
-						__func__, geni_ios);
-		ios_log_limit = 0;
-	}
 exit_start_tx:
 	if (!uart_console(uport))
 		msm_geni_serial_power_off(uport);
@@ -1077,22 +972,17 @@ static void stop_tx_sequencer(struct uart_port *uport)
 	 * this out, remove the vote put in during start_tx().
 	 */
 	if (!uart_console(uport)) {
-		IPC_LOG_MSG(port->ipc_log_misc, "%s:Removing vote\n", __func__);
 		msm_geni_serial_power_off(uport);
 	}
-	IPC_LOG_MSG(port->ipc_log_misc, "%s:\n", __func__);
 }
 
 static void msm_geni_serial_stop_tx(struct uart_port *uport)
 {
-	struct msm_geni_serial_port *port = GET_DEV_PORT(uport);
-
 	if (!uart_console(uport) && device_pending_suspend(uport)) {
 		dev_err(uport->dev, "%s.Device is suspended.\n", __func__);
-		IPC_LOG_MSG(port->ipc_log_misc,
-				"%s.Device is suspended.\n", __func__);
 		return;
 	}
+
 	stop_tx_sequencer(uport);
 }
 
@@ -1132,7 +1022,7 @@ static void start_rx_sequencer(struct uart_port *uport)
 			dev_err(uport->dev, "%s: RX Prep dma failed %d\n",
 				__func__, ret);
 			msm_geni_serial_stop_rx(uport);
-			goto exit_start_rx_sequencer;
+			return;
 		}
 	}
 	/*
@@ -1140,10 +1030,7 @@ static void start_rx_sequencer(struct uart_port *uport)
 	 * go through.
 	 */
 	mb();
-exit_start_rx_sequencer:
 	geni_status = geni_read_reg_nolog(uport->membase, SE_GENI_STATUS);
-	IPC_LOG_MSG(port->ipc_log_misc, "%s: 0x%x, dma_dbg:0x%x\n", __func__,
-		geni_status, geni_read_reg(uport->membase, SE_DMA_DEBUG_REG0));
 }
 
 static void msm_geni_serial_start_rx(struct uart_port *uport)
@@ -1152,8 +1039,6 @@ static void msm_geni_serial_start_rx(struct uart_port *uport)
 
 	if (!uart_console(uport) && device_pending_suspend(uport)) {
 		dev_err(uport->dev, "%s.Device is suspended.\n", __func__);
-		IPC_LOG_MSG(port->ipc_log_misc,
-				"%s.Device is suspended.\n", __func__);
 		return;
 	}
 	start_rx_sequencer(&port->uport);
@@ -1188,7 +1073,6 @@ static void stop_rx_sequencer(struct uart_port *uport)
 	u32 irq_clear = S_CMD_CANCEL_EN;
 	bool done;
 
-	IPC_LOG_MSG(port->ipc_log_misc, "%s\n", __func__);
 	if (port->xfer_mode == FIFO_MODE) {
 		geni_s_irq_en = geni_read_reg_nolog(uport->membase,
 							SE_GENI_S_IRQ_EN);
@@ -1223,15 +1107,10 @@ static void stop_rx_sequencer(struct uart_port *uport)
 		geni_write_reg_nolog(irq_clear, uport->membase,
 						SE_GENI_S_IRQ_CLEAR);
 		goto exit_rx_seq;
-	} else {
-		IPC_LOG_MSG(port->ipc_log_misc, "%s Cancel fail 0x%x\n",
-						__func__, geni_status);
 	}
 
 	geni_status = geni_read_reg_nolog(uport->membase, SE_GENI_STATUS);
 	if ((geni_status & S_GENI_CMD_ACTIVE)) {
-		IPC_LOG_MSG(port->ipc_log_misc, "%s:Abort Rx, GENI:0x%x\n",
-						__func__, geni_status);
 		msm_geni_serial_abort_rx(uport);
 	}
 exit_rx_seq:
@@ -1242,18 +1121,13 @@ exit_rx_seq:
 		port->rx_dma = (dma_addr_t)NULL;
 	}
 	geni_status = geni_read_reg_nolog(uport->membase, SE_GENI_STATUS);
-	IPC_LOG_MSG(port->ipc_log_misc, "%s: 0x%x\n", __func__, geni_status);
 }
 
 static void msm_geni_serial_stop_rx(struct uart_port *uport)
 {
-	struct msm_geni_serial_port *port = GET_DEV_PORT(uport);
-
-	if (!uart_console(uport) && device_pending_suspend(uport)) {
-		IPC_LOG_MSG(port->ipc_log_misc,
-				"%s.Device is suspended.\n", __func__);
+	if (!uart_console(uport) && device_pending_suspend(uport))
 		return;
-	}
+
 	stop_rx_sequencer(uport);
 }
 
@@ -1288,8 +1162,6 @@ static int handle_rx_hs(struct uart_port *uport,
 	}
 	uport->icount.rx += ret;
 	tty_flip_buffer_push(tport);
-	dump_ipc(msm_port->ipc_log_rx, "Rx", (char *)msm_port->rx_fifo, 0,
-								rx_bytes);
 	return ret;
 }
 
@@ -1437,13 +1309,9 @@ static int msm_geni_serial_handle_dma_rx(struct uart_port *uport, bool drop_rx)
 
 	rx_bytes = geni_read_reg_nolog(uport->membase, SE_DMA_RX_LEN_IN);
 	if (unlikely(!msm_port->rx_buf)) {
-		IPC_LOG_MSG(msm_port->ipc_log_rx, "%s: NULL Rx_buf\n",
-								__func__);
 		return 0;
 	}
 	if (unlikely(!rx_bytes)) {
-		IPC_LOG_MSG(msm_port->ipc_log_rx, "%s: Size %d\n",
-					__func__, rx_bytes);
 		goto exit_handle_dma_rx;
 	}
 	if (drop_rx)
@@ -1459,13 +1327,9 @@ static int msm_geni_serial_handle_dma_rx(struct uart_port *uport, bool drop_rx)
 	}
 	uport->icount.rx += ret;
 	tty_flip_buffer_push(tport);
-	dump_ipc(msm_port->ipc_log_rx, "DMA Rx", (char *)msm_port->rx_buf, 0,
-								rx_bytes);
 exit_handle_dma_rx:
 	ret = geni_se_rx_dma_prep(msm_port->wrapper_dev, uport->membase,
 			msm_port->rx_buf, DMA_RX_BUF_SIZE, &msm_port->rx_dma);
-	if (ret)
-		IPC_LOG_MSG(msm_port->ipc_log_rx, "%s: %d\n", __func__, ret);
 	return ret;
 }
 
@@ -1489,8 +1353,6 @@ static int msm_geni_serial_handle_dma_tx(struct uart_port *uport)
 		 * allowing the device to suspend.
 		 */
 		if (!uart_console(uport)) {
-			IPC_LOG_MSG(msm_port->ipc_log_misc,
-				"%s.Power Off.\n", __func__);
 			msm_geni_serial_power_off(uport);
 		}
 		uart_write_wakeup(uport);
@@ -1509,7 +1371,6 @@ static irqreturn_t msm_geni_serial_isr(int isr, void *dev)
 	unsigned long flags;
 	unsigned int m_irq_en;
 	unsigned int geni_status;
-	struct msm_geni_serial_port *msm_port = GET_DEV_PORT(uport);
 	struct tty_port *tport = &uport->state->port;
 	bool drop_rx = false;
 
@@ -1518,8 +1379,6 @@ static irqreturn_t msm_geni_serial_isr(int isr, void *dev)
 		goto exit_geni_serial_isr;
 	if (!uart_console(uport) && pm_runtime_status_suspended(uport->dev)) {
 		dev_err(uport->dev, "%s.Device is suspended.\n", __func__);
-		IPC_LOG_MSG(msm_port->ipc_log_misc,
-				"%s.Device is suspended.\n", __func__);
 		goto exit_geni_serial_isr;
 	}
 	m_irq_status = geni_read_reg_nolog(uport->membase,
@@ -1543,9 +1402,6 @@ static irqreturn_t msm_geni_serial_isr(int isr, void *dev)
 	if (s_irq_status & S_RX_FIFO_WR_ERR_EN) {
 		uport->icount.overrun++;
 		tty_insert_flip_char(tport, 0, TTY_OVERRUN);
-		IPC_LOG_MSG(msm_port->ipc_log_misc,
-			"%s.sirq 0x%x buf_overrun:%d\n",
-			__func__, s_irq_status, uport->icount.buf_overrun);
 	}
 
 	if (!dma) {
@@ -1559,16 +1415,10 @@ static irqreturn_t msm_geni_serial_isr(int isr, void *dev)
 			(s_irq_status & S_GP_IRQ_1_EN)) {
 			if (s_irq_status & S_GP_IRQ_0_EN)
 				uport->icount.parity++;
-			IPC_LOG_MSG(msm_port->ipc_log_misc,
-				"%s.sirq 0x%x parity:%d\n",
-				__func__, s_irq_status, uport->icount.parity);
 			drop_rx = true;
 		} else if ((s_irq_status & S_GP_IRQ_2_EN) ||
 			(s_irq_status & S_GP_IRQ_3_EN)) {
 			uport->icount.brk++;
-			IPC_LOG_MSG(msm_port->ipc_log_misc,
-				"%s.sirq 0x%x break:%d\n",
-				__func__, s_irq_status, uport->icount.brk);
 		}
 
 		if ((s_irq_status & S_RX_FIFO_WATERMARK_EN) ||
@@ -1586,25 +1436,14 @@ static irqreturn_t msm_geni_serial_isr(int isr, void *dev)
 			geni_write_reg_nolog(dma_rx_status, uport->membase,
 					     SE_DMA_RX_IRQ_CLR);
 			if (dma_rx_status & RX_RESET_DONE) {
-				IPC_LOG_MSG(msm_port->ipc_log_misc,
-					"%s.Reset done.  0x%x.\n",
-						__func__, dma_rx_status);
 				goto exit_geni_serial_isr;
 			}
 			if (dma_rx_status & UART_DMA_RX_ERRS) {
 				if (dma_rx_status & UART_DMA_RX_PARITY_ERR)
 					uport->icount.parity++;
-				IPC_LOG_MSG(msm_port->ipc_log_misc,
-					"%s.Rx Errors.  0x%x parity:%d\n",
-					__func__, dma_rx_status,
-					uport->icount.parity);
 				drop_rx = true;
 			} else if (dma_rx_status & UART_DMA_RX_BREAK) {
 				uport->icount.brk++;
-				IPC_LOG_MSG(msm_port->ipc_log_misc,
-					"%s.Rx Errors.  0x%x break:%d\n",
-					__func__, dma_rx_status,
-					uport->icount.brk);
 			}
 			if (dma_rx_status & RX_DMA_DONE)
 				msm_geni_serial_handle_dma_rx(uport, drop_rx);
@@ -1624,13 +1463,9 @@ static irqreturn_t msm_geni_wakeup_isr(int isr, void *dev)
 	unsigned long flags;
 
 	spin_lock_irqsave(&uport->lock, flags);
-	IPC_LOG_MSG(port->ipc_log_rx, "%s: Edge-Count %d\n", __func__,
-							port->edge_count);
 	if (port->wakeup_byte && (port->edge_count == 2)) {
 		tty = uport->state->port.tty;
 		tty_insert_flip_char(tty->port, port->wakeup_byte, TTY_NORMAL);
-		IPC_LOG_MSG(port->ipc_log_rx, "%s: Inject 0x%x\n",
-					__func__, port->wakeup_byte);
 		port->edge_count = 0;
 		tty_flip_buffer_push(tty->port);
 		__pm_wakeup_event(&port->geni_wake, WAKEBYTE_TIMEOUT_MSEC);
@@ -1715,9 +1550,6 @@ static void msm_geni_serial_shutdown(struct uart_port *uport)
 			int i;
 
 			for (i = 0; i < msm_port->ioctl_count; i++) {
-				IPC_LOG_MSG(msm_port->ipc_log_pwr,
-				"%s IOCTL vote present. Forcing off\n",
-								__func__);
 				msm_geni_serial_power_off(uport);
 			}
 			msm_port->ioctl_count = 0;
@@ -1729,7 +1561,6 @@ static void msm_geni_serial_shutdown(struct uart_port *uport)
 			free_irq(msm_port->wakeup_irq, uport);
 		}
 	}
-	IPC_LOG_MSG(msm_port->ipc_log_misc, "%s\n", __func__);
 }
 
 static int msm_geni_serial_port_setup(struct uart_port *uport)
@@ -1861,7 +1692,6 @@ static int msm_geni_serial_startup(struct uart_port *uport)
 			goto exit_startup;
 		}
 	}
-	IPC_LOG_MSG(msm_port->ipc_log_misc, "%s\n", __func__);
 exit_startup:
 	if (likely(!uart_console(uport)))
 		msm_geni_serial_power_off(&msm_port->uport);
@@ -1957,9 +1787,6 @@ static void msm_geni_serial_set_termios(struct uart_port *uport,
 		int ret = msm_geni_serial_power_on(uport);
 
 		if (ret) {
-			IPC_LOG_MSG(port->ipc_log_misc,
-				"%s: Failed to vote clock on:%d\n",
-							__func__, ret);
 			return;
 		}
 	}
@@ -2053,19 +1880,6 @@ static void msm_geni_serial_set_termios(struct uart_port *uport,
 		tx_parity_cfg, rx_trans_cfg, rx_parity_cfg, bits_per_char,
 		stop_bit_len, ser_clk_cfg);
 
-	if (termios->c_cflag & CRTSCTS) {
-		geni_write_reg_nolog(0x0, uport->membase, SE_UART_MANUAL_RFR);
-		IPC_LOG_MSG(port->ipc_log_misc, "%s: Manual flow off\n",
-				__func__);
-	}
-
-	IPC_LOG_MSG(port->ipc_log_misc, "%s: baud %d\n", __func__, baud);
-	IPC_LOG_MSG(port->ipc_log_misc, "Tx: trans_cfg%d parity %d\n",
-						tx_trans_cfg, tx_parity_cfg);
-	IPC_LOG_MSG(port->ipc_log_misc, "Rx: trans_cfg%d parity %d",
-						rx_trans_cfg, rx_parity_cfg);
-	IPC_LOG_MSG(port->ipc_log_misc, "BitsChar%d stop bit%d\n",
-				bits_per_char, stop_bit_len);
 exit_set_termios:
 	msm_geni_serial_start_rx(uport);
 	if (!uart_console(uport))
@@ -2352,47 +2166,6 @@ static void msm_geni_serial_debug_init(struct uart_port *uport, bool console)
 	msm_port->dbg = debugfs_create_dir(dev_name(uport->dev), NULL);
 	if (IS_ERR_OR_NULL(msm_port->dbg))
 		dev_err(uport->dev, "Failed to create dbg dir\n");
-
-	if (!console) {
-		char name[30];
-
-		memset(name, 0, sizeof(name));
-		if (!msm_port->ipc_log_rx) {
-			scnprintf(name, sizeof(name), "%s%s",
-					dev_name(uport->dev), "_rx");
-			msm_port->ipc_log_rx = ipc_log_context_create(
-					IPC_LOG_TX_RX_PAGES, name, 0);
-			if (!msm_port->ipc_log_rx)
-				dev_info(uport->dev, "Err in Rx IPC Log\n");
-		}
-		memset(name, 0, sizeof(name));
-		if (!msm_port->ipc_log_tx) {
-			scnprintf(name, sizeof(name), "%s%s",
-					dev_name(uport->dev), "_tx");
-			msm_port->ipc_log_tx = ipc_log_context_create(
-					IPC_LOG_TX_RX_PAGES, name, 0);
-			if (!msm_port->ipc_log_tx)
-				dev_info(uport->dev, "Err in Tx IPC Log\n");
-		}
-		memset(name, 0, sizeof(name));
-		if (!msm_port->ipc_log_pwr) {
-			scnprintf(name, sizeof(name), "%s%s",
-					dev_name(uport->dev), "_pwr");
-			msm_port->ipc_log_pwr = ipc_log_context_create(
-					IPC_LOG_PWR_PAGES, name, 0);
-			if (!msm_port->ipc_log_pwr)
-				dev_info(uport->dev, "Err in Pwr IPC Log\n");
-		}
-		memset(name, 0, sizeof(name));
-		if (!msm_port->ipc_log_misc) {
-			scnprintf(name, sizeof(name), "%s%s",
-					dev_name(uport->dev), "_misc");
-			msm_port->ipc_log_misc = ipc_log_context_create(
-					IPC_LOG_MISC_PAGES, name, 0);
-			if (!msm_port->ipc_log_misc)
-				dev_info(uport->dev, "Err in Misc IPC Log\n");
-		}
-	}
 }
 #endif
 
@@ -2473,9 +2246,6 @@ static int msm_geni_serial_get_ver_info(struct uart_port *uport)
 
 	msm_port->ver_info.m_fw_ver = get_se_m_fw(uport->membase);
 	msm_port->ver_info.s_fw_ver = get_se_s_fw(uport->membase);
-	IPC_LOG_MSG(msm_port->ipc_log_misc, "%s: FW Ver:0x%x%x\n",
-		__func__,
-		msm_port->ver_info.m_fw_ver, msm_port->ver_info.s_fw_ver);
 
 	hw_ver = geni_se_qupv3_hw_version(msm_port->wrapper_dev,
 		&msm_port->ver_info.hw_major_ver,
@@ -2484,11 +2254,6 @@ static int msm_geni_serial_get_ver_info(struct uart_port *uport)
 	if (hw_ver)
 		dev_err(uport->dev, "%s:Err getting HW version %d\n",
 						__func__, hw_ver);
-	else
-		IPC_LOG_MSG(msm_port->ipc_log_misc, "%s: HW Ver:%x.%x.%x\n",
-			__func__, msm_port->ver_info.hw_major_ver,
-			msm_port->ver_info.hw_minor_ver,
-			msm_port->ver_info.hw_step_ver);
 exit_ver_info:
 	se_geni_clks_off(&msm_port->serial_rsc);
 	return ret;
@@ -2767,7 +2532,6 @@ static int msm_geni_serial_runtime_suspend(struct device *dev)
 		port->edge_count = 0;
 		enable_irq(port->wakeup_irq);
 	}
-	IPC_LOG_MSG(port->ipc_log_pwr, "%s:\n", __func__);
 	__pm_relax(&port->geni_wake);
 exit_runtime_suspend:
 	return ret;
@@ -2804,7 +2568,6 @@ static int msm_geni_serial_runtime_resume(struct device *dev)
 	mb();
 	if (pm_runtime_enabled(dev))
 		enable_irq(port->uport.irq);
-	IPC_LOG_MSG(port->ipc_log_pwr, "%s:\n", __func__);
 exit_runtime_resume:
 	return ret;
 }
@@ -2826,13 +2589,9 @@ static int msm_geni_serial_sys_suspend_noirq(struct device *dev)
 		if (!pm_runtime_status_suspended(dev)) {
 			dev_err(dev, "%s:Active userspace vote; ioctl_cnt %d\n",
 					__func__, port->ioctl_count);
-			IPC_LOG_MSG(port->ipc_log_pwr,
-				"%s:Active userspace vote; ioctl_cnt %d\n",
-					__func__, port->ioctl_count);
 			mutex_unlock(&tty_port->mutex);
 			return -EBUSY;
 		}
-		IPC_LOG_MSG(port->ipc_log_pwr, "%s\n", __func__);
 		mutex_unlock(&tty_port->mutex);
 	}
 	return 0;
