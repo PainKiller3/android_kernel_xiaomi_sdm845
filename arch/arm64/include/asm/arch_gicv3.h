@@ -174,9 +174,9 @@ static inline void gic_write_bpr1(u32 val)
 	write_sysreg_s(val, ICC_BPR1_EL1);
 }
 
-#define gic_read_typer(c)		readq_relaxed_no_log(c)
-#define gic_read_irouter(c)		readq_relaxed_no_log(c)
-#define gic_write_irouter(v, c)		writeq_relaxed_no_log(v, c)
+#define gic_read_typer(c)		readq_relaxed(c)
+#define gic_read_irouter(c)		readq_relaxed(c)
+#define gic_write_irouter(v, c)		writeq_relaxed(v, c)
 
 #endif /* __ASSEMBLY__ */
 #endif /* __ASM_ARCH_GICV3_H */
