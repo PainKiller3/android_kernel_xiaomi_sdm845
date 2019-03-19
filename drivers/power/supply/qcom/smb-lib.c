@@ -21,6 +21,7 @@
 #include <linux/irq.h>
 #include <linux/pmic-voter.h>
 #include <linux/moduleparam.h>
+#include <linux/module.h>
 #include "smb-lib.h"
 #include "smb-reg.h"
 #include "battery.h"
@@ -52,6 +53,8 @@ module_param_string(mode, bootmode, BOOTMODE_LENGTH, 0000);
 				__func__, ##__VA_ARGS__);	\
 	} while (0)
 
+bool skip_thermal = false;
+module_param(skip_thermal, bool, 0644);
 
 static bool off_charge_flag;
 static void smblib_wireless_set_enable(struct smb_charger *chg, int enable);
@@ -2612,10 +2615,16 @@ static void smblib_reg_work(struct work_struct *work)
 static int smblib_therm_charging(struct smb_charger *chg)
 {
 	int thermal_icl_ua = 0;
+	int temp_level;
 	int rc;
 
 	if (chg->system_temp_level >= MAX_TEMP_LEVEL)
 		return 0;
+
+	if (skip_thermal) {
+		temp_level = chg->system_temp_level;
+		chg->system_temp_level = 0;
+	}
 
 	switch (chg->usb_psy_desc.type) {
 	case POWER_SUPPLY_TYPE_USB_HVDCP:
@@ -2668,6 +2677,10 @@ static int smblib_therm_charging(struct smb_charger *chg)
 		if (rc < 0)
 			pr_err("Couldn't disable USB thermal ICL vote rc=%d\n",
 				rc);
+	}
+
+	if (skip_thermal) {
+		chg->system_temp_level = temp_level;
 	}
 
 	return rc;
