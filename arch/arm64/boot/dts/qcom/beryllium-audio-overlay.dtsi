@@ -53,6 +53,25 @@
 	qcom,lpi-gpios;
 };
 
+&slim_aud {
+	tavil_codec {
+		swr_master {
+			wsa881x_0211: wsa881x@20170211 {
+				status = "disabled";
+			};
+			wsa881x_0212: wsa881x@20170212 {
+				status = "disabled";
+			};
+			wsa881x_0213: wsa881x@21170213 {
+				status = "disabled";
+			};
+			wsa881x_0214: wsa881x@21170214 {
+				status = "disabled";
+			};
+		};
+	};
+};
+
 &soc {
 	sbu_uart_en: msm_cdc_pinctrl@49 {
 		compatible = "qcom,msm-cdc-pinctrl";
