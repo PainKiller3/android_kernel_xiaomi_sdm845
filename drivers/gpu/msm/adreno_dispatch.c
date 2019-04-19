@@ -651,12 +651,6 @@ static int sendcmd(struct adreno_device *adreno_dev,
 		return ret;
 	}
 
-	mutex_unlock(&device->mutex);
-
-	dispatch_q->cmd_q[dispatch_q->tail] = cmdobj;
-	dispatch_q->tail = (dispatch_q->tail + 1) %
-		ADRENO_DISPATCH_DRAWQUEUE_SIZE;
-
 	/*
 	 * For the first submission in any given command queue update the
 	 * expected expire time - this won't actually be used / updated until
@@ -667,6 +661,12 @@ static int sendcmd(struct adreno_device *adreno_dev,
 	if (dispatch_q->inflight == 1)
 		dispatch_q->expires = jiffies +
 			msecs_to_jiffies(adreno_drawobj_timeout);
+
+	mutex_unlock(&device->mutex);
+
+	dispatch_q->cmd_q[dispatch_q->tail] = cmdobj;
+	dispatch_q->tail = (dispatch_q->tail + 1) %
+		ADRENO_DISPATCH_DRAWQUEUE_SIZE;
 
 	/*
 	 * If we believe ourselves to be current and preemption isn't a thing,
