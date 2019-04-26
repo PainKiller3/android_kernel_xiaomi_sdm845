@@ -102,6 +102,10 @@
 				  AARCH64_INSN_PRFM_TARGET_##target, \
 				  AARCH64_INSN_PRFM_POLICY_##policy)
 
+/* LSE atomics */
+#define A64_STADD(sf, Rn, Rs) \
+	aarch64_insn_gen_stadd(Rn, Rs, A64_SIZE(sf))
+
 /* Add/subtract (immediate) */
 #define A64_ADDSUB_IMM(sf, Rd, Rn, imm12, type) \
 	aarch64_insn_gen_add_sub_imm(Rd, Rn, imm12, \
