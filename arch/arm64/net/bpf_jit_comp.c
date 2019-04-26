@@ -693,7 +693,6 @@ emit_cond_jmp:
 		if (cpus_have_cap(ARM64_HAS_LSE_ATOMICS)) {
 			emit(A64_STADD(isdw, reg, src), ctx);
 		} else {
-			emit(A64_PRFM(tmp, PST, L1, STRM), ctx);
 			emit(A64_LDXR(isdw, tmp2, reg), ctx);
 			emit(A64_ADD(isdw, tmp2, tmp2, src), ctx);
 			emit(A64_STXR(isdw, tmp2, reg, tmp3), ctx);
