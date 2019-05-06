@@ -39,7 +39,6 @@
 #include <soc/qcom/event_timer.h>
 #include <soc/qcom/lpm_levels.h>
 #include <soc/qcom/lpm-stats.h>
-#include <soc/qcom/minidump.h>
 #include <asm/arch_timer.h>
 #include <asm/suspend.h>
 #include <asm/cpuidle.h>
