@@ -1206,6 +1206,7 @@ static int _sde_kms_get_displays(struct sde_kms *sde_kms)
 	}
 
 	/* dp */
+#ifdef CONFIG_DRM_MSM_DP
 	sde_kms->dp_displays = NULL;
 	sde_kms->dp_display_count = dp_display_get_num_of_displays();
 	if (sde_kms->dp_display_count) {
@@ -1219,12 +1220,15 @@ static int _sde_kms_get_displays(struct sde_kms *sde_kms)
 			dp_display_get_displays(sde_kms->dp_displays,
 					sde_kms->dp_display_count);
 	}
+#endif
 	return 0;
 
+#ifdef CONFIG_DRM_MSM_DP
 exit_deinit_dp:
 	kfree(sde_kms->dp_displays);
 	sde_kms->dp_display_count = 0;
 	sde_kms->dp_displays = NULL;
+#endif
 
 exit_deinit_wb:
 	kfree(sde_kms->wb_displays);
@@ -1306,6 +1310,7 @@ static int _sde_kms_setup_displays(struct drm_device *dev,
 		.cont_splash_config = NULL,
 		.get_panel_vfp = NULL,
 	};
+#ifdef CONFIG_DRM_MSM_DP
 	static const struct sde_connector_ops dp_ops = {
 		.set_info_blob = dp_connnector_set_info_blob,
 		.post_init  = dp_connector_post_init,
@@ -1324,6 +1329,7 @@ static int _sde_kms_setup_displays(struct drm_device *dev,
 		.mode_is_cea_mode = dp_connector_mode_is_cea_mode,
 		.get_csc_type = dp_connector_get_csc_type,
 	};
+#endif
 	static const struct sde_connector_ops ext_bridge_ops = {
 		.set_info_blob = dsi_conn_set_info_blob,
 		.mode_valid = dsi_conn_mode_valid,
@@ -1347,8 +1353,10 @@ static int _sde_kms_setup_displays(struct drm_device *dev,
 		return -EINVAL;
 	}
 
-	max_encoders = sde_kms->dsi_display_count + sde_kms->wb_display_count +
-				sde_kms->dp_display_count;
+	max_encoders = sde_kms->dsi_display_count + sde_kms->wb_display_count;
+#ifdef CONFIG_DRM_MSM_DP
+	max_encoders += sde_kms->dp_display_count;
+#endif
 	if (max_encoders > ARRAY_SIZE(priv->encoders)) {
 		max_encoders = ARRAY_SIZE(priv->encoders);
 		SDE_ERROR("capping number of displays to %d", max_encoders);
@@ -1493,6 +1501,7 @@ static int _sde_kms_setup_displays(struct drm_device *dev,
 			sde_encoder_destroy(encoder);
 		}
 	}
+#ifdef CONFIG_DRM_MSM_DP
 	/* dp */
 	for (i = 0; i < sde_kms->dp_display_count &&
 			priv->num_encoders < max_encoders; ++i) {
@@ -1534,6 +1543,7 @@ static int _sde_kms_setup_displays(struct drm_device *dev,
 			sde_encoder_destroy(encoder);
 		}
 	}
+#endif
 
 	return 0;
 }
