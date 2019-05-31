@@ -169,9 +169,3 @@ config EXPOSURE_ADJUSTMENT
 	help
           The EXPOSURE ADJUSTMENT provides exposure adjustment function without change
           panel hardware brightness to avoid PWM flicker on OLED devices.
-
-config KLAPSE
-	bool "KLapse dynamic RGB scaling module"
-	depends on DRM_MSM
-	help
-	  A simple dynamic RGB lapsing module similar to LineageOS' LiveDisplay.
