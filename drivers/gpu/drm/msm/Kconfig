@@ -153,9 +153,3 @@ config DRM_SDE_XLOG_DEBUG
 	bool "Trigger a panic after the dumping work has completed when SDE error"
 	default n
 	depends on DRM_MSM
-
-config KLAPSE
-	bool "KLapse dynamic RGB scaling module"
-	depends on DRM_MSM
-	help
-	  A simple dynamic RGB lapsing module similar to LineageOS' LiveDisplay.
