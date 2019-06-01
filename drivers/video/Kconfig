@@ -21,6 +21,8 @@ source "drivers/gpu/msm/Kconfig"
 
 source "drivers/gpu/drm/Kconfig"
 
+source "drivers/video/klapse/Kconfig"
+
 menu "Frame buffer Devices"
 source "drivers/video/fbdev/Kconfig"
 endmenu
@@ -46,11 +48,5 @@ if FB || SGI_NEWPORT_CONSOLE
 	source "drivers/video/logo/Kconfig"
 
 endif
-
-config KLAPSE
-    bool CONFIG_KLAPSE
-    default n
-    help
-        A simple rgb dynamic lapsing module similar to LineageOS' livedisplay
 
 endmenu
