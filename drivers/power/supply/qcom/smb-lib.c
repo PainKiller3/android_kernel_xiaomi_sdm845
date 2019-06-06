@@ -20,6 +20,7 @@
 #include <linux/qpnp/qpnp-revid.h>
 #include <linux/irq.h>
 #include <linux/pmic-voter.h>
+#include <linux/moduleparam.h>
 #include "smb-lib.h"
 #include "smb-reg.h"
 #include "battery.h"
@@ -29,6 +30,13 @@
 #ifdef CONFIG_FORCE_FAST_CHARGE
 #include <linux/fastchg.h>
 #endif
+
+#undef MODULE_PARAM_PREFIX
+#define MODULE_PARAM_PREFIX		"androidboot."
+#define BOOTMODE_STR_CHARGER		"charger"
+#define BOOTMODE_LENGTH			20
+static char bootmode[BOOTMODE_LENGTH];
+module_param_string(mode, bootmode, BOOTMODE_LENGTH, 0000);
 
 #define smblib_err(chg, fmt, ...)		\
 	pr_err("%s: %s: " fmt, chg->name,	\
@@ -4372,6 +4380,10 @@ void smblib_usb_plugin_hard_reset_locked(struct smb_charger *chg)
 		}
 	}
 
+	if (!strncmp(bootmode, BOOTMODE_STR_CHARGER,
+			sizeof(BOOTMODE_STR_CHARGER)))
+		vote(chg->awake_votable, CHARGER_MODE_VOTER, !vbus_rising, 0);
+
 	power_supply_changed(chg->usb_psy);
 	smblib_dbg(chg, PR_OEM, "IRQ: usbin-plugin %s\n",
 					vbus_rising ? "attached" : "detached");
@@ -4512,6 +4524,10 @@ void smblib_usb_plugin_locked(struct smb_charger *chg)
 
 	if (chg->connector_type == POWER_SUPPLY_CONNECTOR_MICRO_USB)
 		smblib_micro_usb_plugin(chg, vbus_rising);
+
+	if (!strncmp(bootmode, BOOTMODE_STR_CHARGER,
+			sizeof(BOOTMODE_STR_CHARGER)))
+		vote(chg->awake_votable, CHARGER_MODE_VOTER, !vbus_rising, 0);
 
 	power_supply_changed(chg->usb_psy);
 	smblib_dbg(chg, PR_OEM, "IRQ: usbin-plugin %s\n",
