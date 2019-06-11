@@ -1287,6 +1287,9 @@ i2c_new_device(struct i2c_adapter *adap, struct i2c_board_info const *info)
 	client->dev.of_node = info->of_node;
 	client->dev.fwnode = info->fwnode;
 
+	if (client->flags & I2C_CLIENT_ASYNC_SUSPEND)
+		device_enable_async_suspend(&client->dev);
+
 	i2c_dev_set_name(adap, client);
 	status = device_register(&client->dev);
 	if (status)
@@ -1667,6 +1670,9 @@ static struct i2c_client *of_i2c_register_device(struct i2c_adapter *adap,
 
 	if (of_get_property(node, "wakeup-source", NULL))
 		info.flags |= I2C_CLIENT_WAKE;
+
+	if (of_property_read_bool(node, "async-suspend"))
+		info.flags |= I2C_CLIENT_ASYNC_SUSPEND;
 
 	result = i2c_new_device(adap, &info);
 	if (result == NULL) {
