@@ -608,6 +608,7 @@ void tcp_write_timer_handler(struct sock *sk)
 		goto out;
 	}
 
+	tcp_rate_check_app_limited(sk);
 	event = icsk->icsk_pending;
 
 	switch (event) {
