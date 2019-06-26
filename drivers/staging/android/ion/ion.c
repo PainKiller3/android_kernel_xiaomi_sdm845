@@ -36,7 +36,6 @@
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
 #include <linux/vmalloc.h>
-#include <linux/debugfs.h>
 #include <linux/dma-buf.h>
 #include <linux/idr.h>
 #include <linux/msm_ion.h>
@@ -953,17 +952,6 @@ struct ion_client *ion_client_create(struct ion_device *dev,
 	rb_link_node(&client->node, parent, p);
 	rb_insert_color(&client->node, &dev->clients);
 
-	client->debug_root = debugfs_create_file(client->display_name, 0664,
-						dev->clients_debug_root,
-						client, &debug_client_fops);
-	if (!client->debug_root) {
-		char buf[256], *path;
-
-		path = dentry_path(dev->clients_debug_root, buf, 256);
-		pr_err("Failed to create client debugfs at %s/%s\n",
-			path, client->display_name);
-	}
-
 	up_write(&dev->lock);
 
 	return client;
@@ -987,9 +975,6 @@ void ion_client_destroy(struct ion_client *client)
 	down_write(&dev->lock);
 	rb_erase(&client->node, &dev->clients);
 	up_write(&dev->lock);
-
-	/* After this completes, there are no more references to client */
-	debugfs_remove_recursive(client->debug_root);
 
 	mutex_lock(&client->lock);
 	while ((n = rb_first(&client->handles))) {
@@ -1951,44 +1936,9 @@ void show_ion_usage(struct ion_device *dev)
 	up_read(&dev->lock);
 }
 
-static int debug_shrink_set(void *data, u64 val)
-{
-	struct ion_heap *heap = data;
-	struct shrink_control sc;
-	int objs;
-
-	sc.gfp_mask = GFP_HIGHUSER;
-	sc.nr_to_scan = val;
-
-	if (!val) {
-		objs = heap->shrinker.count_objects(&heap->shrinker, &sc);
-		sc.nr_to_scan = objs;
-	}
-
-	heap->shrinker.scan_objects(&heap->shrinker, &sc);
-	return 0;
-}
-
-static int debug_shrink_get(void *data, u64 *val)
-{
-	struct ion_heap *heap = data;
-	struct shrink_control sc;
-	int objs;
-
-	sc.gfp_mask = GFP_HIGHUSER;
-	sc.nr_to_scan = 0;
-
-	objs = heap->shrinker.count_objects(&heap->shrinker, &sc);
-	*val = objs;
-	return 0;
-}
-
-DEFINE_SIMPLE_ATTRIBUTE(debug_shrink_fops, debug_shrink_get,
-			debug_shrink_set, "%llu\n");
 
 void ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
 {
-	struct dentry *debug_file;
 
 	if (!heap->ops->allocate || !heap->ops->free || !heap->ops->map_dma ||
 	    !heap->ops->unmap_dma)
@@ -2005,41 +1955,10 @@ void ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
 		ion_heap_init_shrinker(heap);
 
 	heap->dev = dev;
-	down_write(&dev->lock);
-	/*
-	 * use negative heap->id to reverse the priority -- when traversing
-	 * the list later attempt higher id numbers first
-	 */
 	plist_node_init(&heap->node, -heap->id);
+
+	down_write(&dev->lock);
 	plist_add(&heap->node, &dev->heaps);
-	debug_file = debugfs_create_file(heap->name, 0664,
-					dev->heaps_debug_root, heap,
-					&debug_heap_fops);
-
-	if (!debug_file) {
-		char buf[256], *path;
-
-		path = dentry_path(dev->heaps_debug_root, buf, 256);
-		pr_err("Failed to create heap debugfs at %s/%s\n",
-			path, heap->name);
-	}
-
-	if (heap->shrinker.count_objects && heap->shrinker.scan_objects) {
-		char debug_name[64];
-
-		snprintf(debug_name, 64, "%s_shrink", heap->name);
-		debug_file = debugfs_create_file(
-			debug_name, 0644, dev->heaps_debug_root, heap,
-			&debug_shrink_fops);
-		if (!debug_file) {
-			char buf[256], *path;
-
-			path = dentry_path(dev->heaps_debug_root, buf, 256);
-			pr_err("Failed to create heap shrinker debugfs at %s/%s\n",
-				path, debug_name);
-		}
-	}
-
 	up_write(&dev->lock);
 }
 EXPORT_SYMBOL(ion_device_add_heap);
@@ -2091,22 +2010,6 @@ struct ion_device *ion_device_create(long (*custom_ioctl)
 		return ERR_PTR(ret);
 	}
 
-	idev->debug_root = debugfs_create_dir("ion", NULL);
-	if (!idev->debug_root) {
-		pr_err("ion: failed to create debugfs root directory.\n");
-		goto debugfs_done;
-	}
-	idev->heaps_debug_root = debugfs_create_dir("heaps", idev->debug_root);
-	if (!idev->heaps_debug_root) {
-		pr_err("ion: failed to create debugfs heaps directory.\n");
-		goto debugfs_done;
-	}
-	idev->clients_debug_root = debugfs_create_dir("clients",
-						idev->debug_root);
-	if (!idev->clients_debug_root)
-		pr_err("ion: failed to create debugfs clients directory.\n");
-
-debugfs_done:
 
 	idev->custom_ioctl = custom_ioctl;
 	idev->buffers = RB_ROOT;
@@ -2122,7 +2025,6 @@ EXPORT_SYMBOL(ion_device_create);
 void ion_device_destroy(struct ion_device *dev)
 {
 	misc_deregister(&dev->dev);
-	debugfs_remove_recursive(dev->debug_root);
 	/* XXX need to free the heaps and clients ? */
 	kfree(dev);
 }
