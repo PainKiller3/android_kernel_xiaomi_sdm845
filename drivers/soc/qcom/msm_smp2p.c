@@ -1948,11 +1948,11 @@ static int __init msm_smp2p_init(void)
 		INIT_LIST_HEAD(&in_list[i].list);
 		in_list[i].smem_edge_in = NULL;
 	}
-
+#ifdef CONFIG_IPC_LOGGING
 	log_ctx = ipc_log_context_create(NUM_LOG_PAGES, "smp2p", 0);
 	if (!log_ctx)
 		SMP2P_ERR("%s: unable to create log context\n", __func__);
-
+#endif
 	rc = platform_driver_register(&msm_smp2p_driver);
 	if (rc) {
 		SMP2P_ERR("%s: msm_smp2p_driver register failed %d\n",

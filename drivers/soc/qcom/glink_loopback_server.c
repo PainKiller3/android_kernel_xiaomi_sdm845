@@ -23,7 +23,9 @@
 /* Number of internal IPC Logging log pages */
 #define GLINK_LBSRV_NUM_LOG_PAGES	3
 
+#ifdef CONFIG_IPC_LOGGING
 static void *glink_lbsrv_log_ctx;
+#endif
 
 #define GLINK_LBSRV_IPC_LOG_STR(x...) ((void)0)
 
@@ -1260,12 +1262,12 @@ static int glink_loopback_server_init(void)
 	int i;
 	int ret;
 	struct ch_info *tmp_ch_info;
-
+#ifdef CONFIG_IPC_LOGGING
 	glink_lbsrv_log_ctx = ipc_log_context_create(GLINK_LBSRV_NUM_LOG_PAGES,
 							"glink_lbsrv", 0);
 	if (!glink_lbsrv_log_ctx)
 		pr_err("%s: unable to create log context\n", __func__);
-
+#endif
 	glink_lbsrv_wq = create_singlethread_workqueue("glink_lbsrv");
 	if (!glink_lbsrv_wq) {
 		LBSRV_ERR("%s: Error creating glink_lbsrv_wq\n", __func__);
