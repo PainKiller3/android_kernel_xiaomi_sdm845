@@ -45,8 +45,10 @@ enum {
 static int msm_smem_debug_mask = MSM_SMEM_INFO;
 module_param_named(debug_mask, msm_smem_debug_mask,
 			int, S_IRUGO | S_IWUSR | S_IWGRP);
+#ifdef CONFIG_IPC_LOGGING
 static void *smem_ipc_log_ctx;
 #define NUM_LOG_PAGES 4
+#endif
 
 #define IPC_LOG(x...) ((void)0)
 
@@ -1638,11 +1640,13 @@ int __init msm_smem_init(void)
 
 	registered = true;
 	smem_max_items = SMEM_NUM_ITEMS;
+#ifdef CONFIG_IPC_LOGGING
 	smem_ipc_log_ctx = ipc_log_context_create(NUM_LOG_PAGES, "smem", 0);
 	if (!smem_ipc_log_ctx) {
 		pr_err("%s: unable to create logging context\n", __func__);
 		msm_smem_debug_mask = 0;
 	}
+#endif
 
 	rc = platform_driver_register(&msm_smem_driver);
 	if (rc) {
