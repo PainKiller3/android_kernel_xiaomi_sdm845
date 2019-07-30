@@ -1,4 +1,3 @@
-ccflags-$(CONFIG_MIUI_CUST_GLOBAL) += -DMIUI_CUST_GLOBAL
 snd-soc-wcd9xxx-objs := wcd9xxx-common-v2.o wcd9xxx-resmgr-v2.o \
 			wcdcal-hwdep.o wcd9xxx-soc-init.o wcd-dsp-utils.o \
 			wcd-dsp-mgr.o audio-ext-clk-up.o
