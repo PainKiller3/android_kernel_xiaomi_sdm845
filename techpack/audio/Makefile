@@ -14,3 +14,4 @@ obj-y += ipc/
 obj-y += soc/
 
 subdir-ccflags-y := $(call cc-disable-warning, misleading-indentation)
+subdir-ccflags-y := -Os -g0
