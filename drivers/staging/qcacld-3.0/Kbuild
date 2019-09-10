@@ -2255,6 +2255,8 @@ ccflags-y += -DWLAN_MAX_VDEVS=$(CONFIG_WLAN_MAX_VDEVS)
 KBUILD_CPPFLAGS += $(cppflags-y)
 
 ccflags-y += -Wmissing-prototypes
+ccflags-y += -Os
+ccflags-y += -g0
 
 ifeq ($(call cc-option-yn, -Wheader-guard), y)
 ccflags-y += -Wheader-guard
