@@ -3276,6 +3276,8 @@ cppflags-$(CONFIG_GENERIC_SHADOW_REGISTER_ACCESS_ENABLE) += -DGENERIC_SHADOW_REG
 KBUILD_CPPFLAGS += $(cppflags-y)
 
 ccflags-y += -Wmissing-prototypes
+ccflags-y += -Os
+ccflags-y += -g0
 
 ifeq ($(call cc-option-yn, -Wheader-guard), y)
 ccflags-y += -Wheader-guard
