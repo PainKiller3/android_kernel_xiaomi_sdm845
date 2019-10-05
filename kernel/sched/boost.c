@@ -185,6 +185,8 @@ int sched_set_boost(int type)
 {
 	int ret = 0;
 
+	return 0;
+
 	mutex_lock(&boost_mutex);
 
 	if (verify_boost_params(sysctl_sched_boost, type))
