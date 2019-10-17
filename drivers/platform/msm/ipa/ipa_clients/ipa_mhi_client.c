@@ -1471,7 +1471,8 @@ static int ipa_mhi_reset_dl_channel(struct ipa_mhi_channel_ctx *channel)
 	return 0;
 }
 
-static int ipa_mhi_reset_channel(struct ipa_mhi_channel_ctx *channel)
+static int ipa_mhi_reset_channel(struct ipa_mhi_channel_ctx *channel,
+				 bool update_state)
 {
 	int res;
 
@@ -1487,7 +1488,8 @@ static int ipa_mhi_reset_channel(struct ipa_mhi_channel_ctx *channel)
 
 	channel->state = IPA_HW_MHI_CHANNEL_STATE_DISABLE;
 
-	if (ipa_get_transport_type() == IPA_TRANSPORT_TYPE_GSI) {
+	if ((ipa_get_transport_type() == IPA_TRANSPORT_TYPE_GSI) &&
+		update_state) {
 		res = ipa_mhi_read_write_host(IPA_MHI_DMA_TO_HOST,
 			&channel->state, channel->channel_context_addr +
 				offsetof(struct ipa_mhi_ch_ctx, chstate),
@@ -1646,7 +1648,7 @@ int ipa_mhi_connect_pipe(struct ipa_mhi_connect_params *in, u32 *clnt_hdl)
 
 	return 0;
 fail_connect_pipe:
-	ipa_mhi_reset_channel(channel);
+	ipa_mhi_reset_channel(channel, true);
 fail_start_channel:
 	IPA_ACTIVE_CLIENTS_DEC_EP(in->sys.client);
 	return -EPERM;
@@ -1694,7 +1696,7 @@ int ipa_mhi_disconnect_pipe(u32 clnt_hdl)
 
 	IPA_ACTIVE_CLIENTS_INC_EP(ipa_get_client_mapping(clnt_hdl));
 
-	res = ipa_mhi_reset_channel(channel);
+	res = ipa_mhi_reset_channel(channel, false);
 	if (res) {
 		IPA_MHI_ERR("ipa_mhi_reset_channel failed %d\n", res);
 		goto fail_reset_channel;
