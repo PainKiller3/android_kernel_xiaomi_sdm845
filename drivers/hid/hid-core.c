@@ -558,8 +558,6 @@ static void hid_concatenate_last_usage_page(struct hid_parser *parser)
 	if (!parser->local.usage_index)
 		return;
 
-	usage_page = parser->global.usage_page;
-
 	/*
 	 * Concatenate usage page again only if last declared Usage Page
 	 * has not been already used in previous usages concatenation
