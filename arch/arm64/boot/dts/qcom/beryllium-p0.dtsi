@@ -143,7 +143,6 @@
 		thermal,batt-level-screen-on = "0 0 0 0 1 1 2 3 4 5 6 7 8 0 0 0 0 1 1 2 3 4 5 6 7 8";
 		thermal,batt-level-screen-off = "0 0 0 0 1 1 2 3 4 5 6 7 8 0 0 0 0 1 1 2 3 4 5 6 7 8";
 	};
-
 };
 
 &labibb {
@@ -305,11 +304,11 @@
 };
 
 &pmi8998_charger {
-	qcom,usb-icl-ua = <3000000>;
-	qcom,fcc-max-ua = <2800000>;
-	qcom,fcc-low-temp-delta = <2520000>;
-	qcom,fcc-hot-temp-delta = <1400000>;
-	qcom,fcc-cool-temp-delta = <1960000>;
+	qcom,usb-icl-ua = <2800000>;
+	qcom,fcc-max-ua = <3300000>;
+	qcom,fcc-low-temp-delta = <2970000>;
+	qcom,fcc-hot-temp-delta = <1650000>;
+	qcom,fcc-cool-temp-delta = <2310000>;
 	qcom,auto-recharge-soc;
 	qcom,sw-jeita-enable;
 	qcom,dynamic-fv-enable;
@@ -320,7 +319,7 @@
 				   1800000 1800000 1800000 1800000 1800000 1600000 1400000
 				   1200000 1000000>;
 	qcom,thermal-mitigation-qc3
-				= <3000000 2725000 2575000 2425000 2275000 2125000 2000000
+				= <2800000 2725000 2575000 2425000 2275000 2125000 2000000
 				   1800000 1650000 1500000 1360000 1200000 1060000 900000
 				   752500 525000>;
 	qcom,thermal-mitigation-qc2
