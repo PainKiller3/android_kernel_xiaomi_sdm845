@@ -2,7 +2,7 @@ qcom,e10_cos_4000mah {
 	qcom, = <24>;
 	/* #3434841_Xiaomi_E10cos_4000mAh_averaged_MasterSlave_Apr24th2018*/
 	qcom,max-voltage-uv = <4400000>;
-	qcom,fastchg-current-ma = <2800>;
+	qcom,fastchg-current-ma = <3500>;
 	qcom,nom-batt-capacity-mah = <4000>;
 	qcom,fg-cc-cv-threshold-mv = <4390>;
 	qcom,batt-id-kohm = <100>;
