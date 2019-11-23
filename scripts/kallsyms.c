@@ -59,10 +59,10 @@ static struct addr_range percpu_range = {
 
 static struct sym_entry *table;
 static unsigned int table_size, table_cnt;
-static int all_symbols = 0;
-static int absolute_percpu = 0;
+static int all_symbols;
+static int absolute_percpu;
+static int base_relative;
 static char symbol_prefix_char = '\0';
-static int base_relative = 0;
 
 int token_profit[0x10000];
 
