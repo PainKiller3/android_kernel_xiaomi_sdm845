@@ -110,6 +110,7 @@ static bool is_ignored_symbol(const char *name, char type)
 	};
 
 	static const char * const ignored_prefixes[] = {
+		"$",			/* local symbols for ARM, MIPS, etc. */
 		"__crc_",		/* modversions */
 		"__efistub_",		/* arm64 EFI stub namespace */
 		NULL
@@ -208,13 +209,6 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 
 	}
 	else if (toupper(stype) == 'U')
-		return -1;
-	/*
-	 * Ignore generated symbols such as:
-	 *  - mapping symbols in ARM ELF files ($a, $t, and $d)
-	 *  - MIPS ELF local symbols ($L123 instead of .L123)
-	 */
-	else if (str[0] == '$')
 		return -1;
 	/* exclude debugging symbols */
 	else if (stype == 'N')
