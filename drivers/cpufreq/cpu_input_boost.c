@@ -50,11 +50,6 @@ module_param(remove_input_boost_freq_perf, uint, 0644);
 module_param(input_boost_duration, short, 0644);
 module_param(wake_boost_duration, short, 0644);
 
-#ifdef CONFIG_DYNAMIC_STUNE_BOOST
-static __read_mostly int stune_boost = CONFIG_TA_STUNE_BOOST;
-module_param_named(dynamic_stune_boost, stune_boost, int, 0644);
-#endif
-
 /* Available bits for boost state */
 enum {
 	SCREEN_OFF,
@@ -71,8 +66,6 @@ struct boost_drv {
 	atomic_long_t max_boost_expires;
 	unsigned long state;
 
-	bool stune_active;
-	int stune_slot;
 };
 
 static void input_unboost_worker(struct work_struct *work);
@@ -137,23 +130,6 @@ static void update_online_cpu_policy(void)
 	cpu = cpumask_first_and(cpu_perf_mask, cpu_online_mask);
 	cpufreq_update_policy(cpu);
 	put_online_cpus();
-}
-
-static void update_stune_boost(struct boost_drv *b, int value)
-{
-#ifdef CONFIG_DYNAMIC_STUNE_BOOST
-	if (value && !b->stune_active)
-		b->stune_active = !do_stune_boost("top-app", value,
-						  &b->stune_slot);
-#endif
-}
-
-static void clear_stune_boost(struct boost_drv *b)
-{
-#ifdef CONFIG_DYNAMIC_STUNE_BOOST
-	if (b->stune_active)
-		b->stune_active = reset_stune_boost("top-app", b->stune_slot);
-#endif
 }
 
 static void __cpu_input_boost_kick(struct boost_drv *b)
@@ -267,14 +243,12 @@ static int cpu_notifier_cb(struct notifier_block *nb, unsigned long action,
 	/* Unboost when the screen is off */
 	if (test_bit(SCREEN_OFF, &b->state)) {
 		policy->min = get_min_freq(policy);
-		clear_stune_boost(b);
 		return NOTIFY_OK;
 	}
 
 	/* Boost CPU to max frequency for max boost */
 	if (test_bit(MAX_BOOST, &b->state)) {
 		policy->min = get_max_boost_freq(policy);
-		update_stune_boost(b, stune_boost);
 		return NOTIFY_OK;
 	}
 
@@ -284,10 +258,8 @@ static int cpu_notifier_cb(struct notifier_block *nb, unsigned long action,
 	 */
 	if (test_bit(INPUT_BOOST, &b->state)) {
 		policy->min = get_input_boost_freq(policy);
-		update_stune_boost(b, stune_boost);
 	} else {
 		policy->min = get_min_freq(policy);
-		clear_stune_boost(b);
 	}
 
 	return NOTIFY_OK;
