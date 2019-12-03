@@ -26,6 +26,8 @@ SECTIONS {
 		*(.rodata .rodata.[0-9a-zA-Z_]*)
 		*(.rodata..L* .rodata..compoundliteral*)
 	}
-
+	.rela.data : { *(.rela.data .rela.data[.0-9a-zA-Z_]*) }
+	.rela.rodata : { *(.rela.rodata .rela.rodata[.0-9a-zA-Z_]*) }
+	.rela.text : { *(.rela.text .rela.text[.0-9a-zA-Z_]*) }
 	.text : { *(.text .text.[0-9a-zA-Z_]*) }
 }
