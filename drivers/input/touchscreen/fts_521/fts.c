@@ -43,7 +43,6 @@
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
 #include <linux/spi/spi.h>
-#include <linux/completion.h>
 
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
@@ -77,8 +76,6 @@
 #ifdef CONFIG_INPUT_PRESS_NDT
 #include "./../ndt_core.h"
 #endif
-
-#define PROC_SYMLINK_PATH "touchpanel"
 
 /**
  * Event handler installer helpers
@@ -2209,7 +2206,7 @@ static ssize_t fts_doze_time_store(struct device *dev,
 	if (ret < OK) {
 		logError(1, "%s %s: write failed...ERROR %08X !\n", tag,
 			 __func__, ret);
-		return ret;
+		return -EPERM;
 	}
 	return count;
 }
@@ -2237,7 +2234,7 @@ static ssize_t fts_grip_enable_store(struct device *dev,
 	if (ret < OK) {
 		logError(1, "%s %s: write failed...ERROR %08X !\n", tag,
 			 __func__, ret);
-		return ret;
+		return -EPERM;
 	}
 	return count;
 }
@@ -2258,51 +2255,42 @@ static ssize_t fts_grip_area_store(struct device *dev,
 	int ret = 0;
 	struct fts_ts_info *info = dev_get_drvdata(dev);
 
-	pr_info("%s,buf:%s,count:%zu\n", __func__, buf, count);
+	logError(1, " %s %s,buf:%s,count:%zu\n", tag, __func__, buf, count);
 	sscanf(buf, "%u", &info->grip_pixel);
 	cmd[3] = info->grip_pixel;
+	if (atomic_read(&info->system_is_resetting)) {
+		logError(1, "%s %s system is resetting ,wait reset done\n", tag, __func__);
+		ret = wait_for_completion_timeout(&info->tp_reset_completion, msecs_to_jiffies(40));
+		if (!ret) {
+			logError(1, "%s %s wait tp reset timeout, wrtie grip area error\n", tag, __func__);
+			return count;
+		}
+	}
 	ret = fts_write(cmd, ARRAY_SIZE(cmd));
 	if (ret < OK) {
 		logError(1, "%s %s: write failed...ERROR %08X !\n", tag,
 			 __func__, ret);
-		return ret;
+		return -EPERM;
 	}
 	return count;
 }
 
-static ssize_t fts_wake_gesture_store(struct device *dev,
-					struct device_attribute *attr,
-					const char *buf, size_t count)
+static ssize_t fts_fod_status_show(struct device *dev,
+				    struct device_attribute *attr, char *buf)
 {
-	unsigned int input = 0;
-	static const char *fts_gesture_on = "01 20";
-	static const char *fts_gesture_off = "00 20";
 	struct fts_ts_info *info = dev_get_drvdata(dev);
-	char *gesture_result;
-	int size = 6 * 2 + 1;
-	if (sscanf(buf, "%u", &input) != 1)
-		return -EINVAL;
 
-	if (input == 1) {
-		gesture_result = (u8 *) kzalloc(size, GFP_KERNEL);
-		fts_gesture_mask_store(info->dev, NULL,
-				fts_gesture_on, strlen(fts_gesture_on));
-		fts_gesture_mask_show(info->dev, NULL,
-				gesture_result);
-	} else {
-		gesture_result = (u8 *) kzalloc(size, GFP_KERNEL);
-		fts_gesture_mask_store(info->dev, NULL,
-				fts_gesture_off, strlen(fts_gesture_off));
-		fts_gesture_mask_show(info->dev, NULL,
-				gesture_result);
-	}
+	return snprintf(buf, TSP_BUF_SIZE, "%d\n", info->fod_status);
+}
 
-	if (strncmp("{ 00000000 }", gesture_result, size - 1))
-		logError(1, "%s %s: store gesture mask error\n", tag, __func__);
+static ssize_t fts_fod_status_store(struct device *dev,
+				     struct device_attribute *attr,
+				     const char *buf, size_t count)
+{
+	struct fts_ts_info *info = dev_get_drvdata(dev);
 
-	kfree(gesture_result);
-	gesture_result = NULL;
-
+	logError(1, " %s %s,buf:%s,count:%zu\n", tag, __func__, buf, count);
+	sscanf(buf, "%u", &info->fod_status);
 	return count;
 }
 
@@ -2369,8 +2357,6 @@ static DEVICE_ATTR(grip_enable, (S_IRUGO | S_IWUSR | S_IWGRP),
 		   fts_grip_enable_show, fts_grip_enable_store);
 static DEVICE_ATTR(grip_area, (S_IRUGO | S_IWUSR | S_IWGRP),
 		   fts_grip_area_show, fts_grip_area_store);
-static DEVICE_ATTR(wake_gesture, (S_IRUGO | S_IWUSR),
-		   fts_gesture_mask_show, fts_wake_gesture_store);
 
 static struct attribute *fts_attr_group[] = {
 	&dev_attr_fwupdate.attr,
@@ -2415,10 +2401,11 @@ static struct attribute *fts_attr_group[] = {
 	&dev_attr_doze_time.attr,
 	&dev_attr_grip_enable.attr,
 	&dev_attr_grip_area.attr,
-	&dev_attr_wake_gesture.attr,
-
 	NULL,
 };
+
+static DEVICE_ATTR(fod_status, (S_IRUGO | S_IWUSR | S_IWGRP),
+		   fts_fod_status_show, fts_fod_status_store);
 
 /**@}*/
 /**@}*/
@@ -2999,7 +2986,7 @@ static void fts_gesture_event_handler(struct fts_ts_info *info,
 	if (event[0] == EVT_ID_USER_REPORT && event[1] == EVT_TYPE_USER_GESTURE) {
 		needCoords = 1;
 #ifdef CONFIG_INPUT_PRESS_NDT
-		if (event[2] == GEST_ID_LONG_PRESS) {
+		if (event[2] == GEST_ID_LONG_PRESS && info->fod_status) {
 			fts_fod_status = true;
 			if (fts_is_in_fodarea(x, y)) {
 				if (!finger_report_flag) {
@@ -3708,27 +3695,6 @@ static int fts_init_sensing(struct fts_ts_info *info)
 
 	return error;
 }
-#define MAX_REG_LEN 10
-void fts_restore_regvalues(void)
-{
-	char *temp_buf;
-
-	if (fts_info == NULL)
-		return;
-	logError(1, "%s\n", tag, __func__);
-	if (fts_info->grip_pixel != fts_info->grip_pixel_def) {
-		temp_buf = (char *)kzalloc(MAX_REG_LEN, GFP_KERNEL);
-		if (temp_buf == NULL) {
-			logError(1, "%s %s alloc temp buf error\n", tag, __func__);
-		} else {
-			snprintf(temp_buf, MAX_REG_LEN, "%u", fts_info->grip_pixel);
-			fts_grip_area_store(fts_info->dev, NULL, temp_buf, strlen(temp_buf));
-			memset(temp_buf, 0, MAX_REG_LEN);
-			kfree(temp_buf);
-			temp_buf = NULL;
-		}
-	}
-}
 
 /**
  * @ingroup mode_section
@@ -3778,6 +3744,11 @@ static int fts_mode_handler(struct fts_ts_info *info, int force)
 			if (res < OK)
 					logError(1, "%s %s: set single only delay time failed! ERROR %08X\n", tag, __func__, res);
 		}
+		ret = fts_enableInterrupt();
+		if (ret < OK)
+			logError(1, "%s enterGestureMode: fts_enableInterrupt ERROR %08X\n", tag, res | ERROR_ENABLE_INTER);
+		else
+			logError(1, "%s enterGestureMode: fts_enableInterrupt\n", tag);
 #else
 		if (info->gesture_enabled == 1) {
 			logError(0, "%s %s: enter in gesture mode ! \n", tag,
@@ -3923,9 +3894,6 @@ static int fts_mode_handler(struct fts_ts_info *info, int force)
 			res |= setScanMode(SCAN_MODE_ACTIVE, 0x01);
 		}
 #else
-		if (info && isSystemResettedUp()) {
-			fts_restore_regvalues();
-		}
 		settings[0] = 0x01;
 		logError(1, "%s %s: Sense ON! \n", tag, __func__);
 		res |= setScanMode(SCAN_MODE_ACTIVE, settings[0]);
@@ -3946,11 +3914,6 @@ static int fts_mode_handler(struct fts_ts_info *info, int force)
 		 tag, __func__, res, info->mode);
 	return res;
 
-}
-
-static void fts_reg_restore_work(struct work_struct *work)
-{
-	fts_restore_regvalues();
 }
 
 /**
@@ -3976,7 +3939,6 @@ static void fts_resume_work(struct work_struct *work)
 	info->sensor_sleep = false;
 
 	fts_enableInterrupt();
-	schedule_delayed_work(&info->reg_restore_work, msecs_to_jiffies(500));
 }
 
 /**
@@ -3995,7 +3957,6 @@ static void fts_suspend_work(struct work_struct *work)
 
 	info->sensor_sleep = true;
 
-	fts_enableInterrupt();
 }
 
 #ifdef CONFIG_DRM
@@ -4012,6 +3973,7 @@ static int fts_drm_state_chg_callback(struct notifier_block *nb,
 	    container_of(nb, struct fts_ts_info, notifier);
 	struct fb_event *evdata = data;
 	unsigned int blank;
+	int ret;
 
 	logError(0, "%s %s: fts notifier begin!\n", tag, __func__);
 
@@ -4028,6 +3990,11 @@ static int fts_drm_state_chg_callback(struct notifier_block *nb,
 
 			logError(1, "%s %s: FB_BLANK_POWERDOWN\n", tag,
 				 __func__);
+		ret = fts_disableInterrupt();
+		if (ret < OK)
+			logError(1, "%s fts_disableInterrupt ERROR %08X\n", tag, ret | ERROR_ENABLE_INTER);
+		else
+			logError(1, "%s fts_disableInterrupt\n", tag, ret | ERROR_ENABLE_INTER);
 
 			queue_work(info->event_wq, &info->suspend_work);
 		} else if (val == DRM_EVENT_BLANK && blank == DRM_BLANK_UNBLANK) {
@@ -4465,34 +4432,6 @@ static void fts_switch_mode_work(struct work_struct *work)
 		kfree(ms);
 		ms = NULL;
 	}
-}
-
-static ssize_t fts_input_symlink(struct fts_ts_info *info) {
-	char *driver_path;
-	int ret = 0;
-
-	if (info->input_proc) {
-		proc_remove(info->input_proc);
-		info->input_proc = NULL;
-	}
-
-	driver_path = kzalloc(PATH_MAX, GFP_KERNEL);
-	if (!driver_path) {
-		return -ENOMEM;
-	}
-
-	sprintf(driver_path, "/sys%s",
-			kobject_get_path(&info->input_dev->dev.kobj, GFP_KERNEL));
-
-	pr_info("%s: driver_path=%s\n", __func__, driver_path);
-	info->input_proc = proc_symlink(PROC_SYMLINK_PATH, NULL, driver_path);
-	if (!info->input_proc) {
-		ret = -ENOMEM;
-	}
-
-	kfree(driver_path);
-
-	return ret;
 }
 
 static int fts_input_event(struct input_dev *dev, unsigned int type,
@@ -4968,7 +4907,6 @@ static int fts_probe(struct spi_device *client)
 	int retval;
 	int skip_5_1 = 0;
 	u16 bus_type;
-	u8 *tp_maker;
 
 	logError(1, "%s %s: driver ver: %s\n", tag, __func__,
 		 FTS_TS_DRV_VERSION);
@@ -5081,6 +5019,7 @@ static int fts_probe(struct spi_device *client)
 	INIT_WORK(&info->work, fts_event_handler);
 	INIT_WORK(&info->resume_work, fts_resume_work);
 	INIT_WORK(&info->suspend_work, fts_suspend_work);
+	init_completion(&info->tp_reset_completion);
 
 	logError(0, "%s SET Input Device Property: \n", tag);
 	info->dev = &info->client->dev;
@@ -5101,8 +5040,6 @@ static int fts_probe(struct spi_device *client)
 	info->input_dev->id.version = 0x0100;
 	info->input_dev->event = fts_input_event;
 	input_set_drvdata(info->input_dev, info);
-
-	info->input_proc = NULL;
 
 	__set_bit(EV_SYN, info->input_dev->evbit);
 	__set_bit(EV_KEY, info->input_dev->evbit);
@@ -5184,11 +5121,6 @@ static int fts_probe(struct spi_device *client)
 		goto ProbeErrorExit_5_1;
 	}
 
-	retval = fts_input_symlink(info);
-	if (retval < 0) {
-		logError(1, "%s ERROR: fts_ts_info is NULL\n", tag);
-	}
-
 	skip_5_1 = 1;
 	/* track slots */
 	info->touch_id = 0;
@@ -5221,7 +5153,6 @@ static int fts_probe(struct spi_device *client)
 		error = -ENODEV;
 		goto ProbeErrorExit_6;
 	}
-	/*update_hardware_info(TYPE_TOUCH, 4);*/
 
 	error = fts_get_lockdown_info(info->lockdown_info, info);
 
@@ -5235,7 +5166,6 @@ static int fts_probe(struct spi_device *client)
 			 info->lockdown_info[4], info->lockdown_info[5],
 			 info->lockdown_info[6], info->lockdown_info[7]);
 		info->lockdown_is_ok = true;
-		/*update_hardware_info(TYPE_TP_MAKER, info->lockdown_info[0] - 0x30); */
 	}
 
 #ifdef FW_UPDATE_ON_PROBE
@@ -5259,12 +5189,11 @@ static int fts_probe(struct spi_device *client)
 	}
 	INIT_DELAYED_WORK(&info->fwu_work, fts_fw_update_auto);
 #endif
-	INIT_DELAYED_WORK(&info->reg_restore_work, fts_reg_restore_work);
 
 	logError(0, "%s SET Device File Nodes: \n", tag);
 	/* sysfs stuff */
 	info->attrs.attrs = fts_attr_group;
-	error = sysfs_create_group(&info->input_dev->dev.kobj, &info->attrs);
+	error = sysfs_create_group(&client->dev.kobj, &info->attrs);
 	if (error) {
 		logError(1, "%s ERROR: Cannot create sysfs structure!\n", tag);
 		error = -ENODEV;
@@ -5276,13 +5205,6 @@ static int fts_probe(struct spi_device *client)
 	if (error < OK)
 		logError(1, "%s Error: can not create /proc file! \n", tag);
 
-	tp_maker = kzalloc(20, GFP_KERNEL);
-	if (tp_maker == NULL)
-		logError(1, "%s fail to alloc vendor name memory\n", tag);
-	else {
-		kfree(tp_maker);
-		tp_maker = NULL;
-	}
 	device_init_wakeup(&client->dev, 1);
 
 #ifdef CONFIG_TOUCHSCREEN_ST_DEBUG_FS
@@ -5292,6 +5214,22 @@ static int fts_probe(struct spi_device *client)
 				    &tpdbg_operations);
 	}
 #endif
+	if (info->fts_tp_class == NULL)
+		info->fts_tp_class = class_create(THIS_MODULE, "touch");
+	info->fts_touch_dev = device_create(info->fts_tp_class, NULL, 0x49, info, "tp_dev");
+
+	if (IS_ERR(info->fts_touch_dev)) {
+		logError(1, "%s ERROR: Failed to create device for the sysfs!\n", tag);
+		goto ProbeErrorExit_8;
+	}
+
+	dev_set_drvdata(info->fts_touch_dev, info);
+	error =
+	    sysfs_create_file(&info->fts_touch_dev->kobj,
+			      &dev_attr_fod_status.attr);
+	if (error) {
+		logError(1, "%s ERROR: Failed to create fod_status sysfs group!\n", tag);
+	}
 	info->tp_lockdown_info_proc =
 	    proc_create("tp_lockdown_info", 0, NULL, &fts_lockdown_info_ops);
 	info->tp_selftest_proc =
@@ -5308,6 +5246,10 @@ static int fts_probe(struct spi_device *client)
 
 	logError(1, "%s Probe Finished! \n", tag);
 	return OK;
+ProbeErrorExit_8:
+	device_destroy(info->fts_tp_class, 0x49);
+	class_destroy(info->fts_tp_class);
+	info->fts_tp_class = NULL;
 ProbeErrorExit_7:
 #ifdef CONFIG_DRM
 	drm_unregister_client(&info->notifier);
@@ -5371,7 +5313,9 @@ static int fts_remove(struct spi_device *client)
 #ifndef FW_UPDATE_ON_PROBE
 	destroy_workqueue(info->fwu_workqueue);
 #endif
-
+	device_destroy(info->fts_tp_class, DCHIP_ID_0);
+	class_destroy(info->fts_tp_class);
+	info->fts_tp_class = NULL;
 	fts_enable_reg(info, false);
 	fts_get_reg(info, false);
 	fts_info = NULL;

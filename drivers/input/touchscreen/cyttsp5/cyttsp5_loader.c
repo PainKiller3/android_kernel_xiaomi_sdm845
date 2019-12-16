@@ -42,13 +42,19 @@
 #define CYTTSP5_AUTO_LOAD_FOR_CORRUPTED_FW 1
 #define CYTTSP5_LOADER_FW_UPGRADE_RETRY_COUNT 3
 
-#define CYTTSP5_FW_UPGRADE \
-	(defined(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_PLATFORM_FW_UPGRADE) \
-	|| defined(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_BINARY_FW_UPGRADE))
+#if defined(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_PLATFORM_FW_UPGRADE) || \
+    defined(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_BINARY_FW_UPGRADE)
+#define CYTTSP5_FW_UPGRADE 1
+#else
+#define CYTTSP5_FW_UPGRADE 0
+#endif
 
-#define CYTTSP5_TTCONFIG_UPGRADE \
-	(defined(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_PLATFORM_TTCONFIG_UPGRADE) \
-	|| defined(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_MANUAL_TTCONFIG_UPGRADE))
+#if defined(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_PLATFORM_TTCONFIG_UPGRADE) || \
+    defined(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_MANUAL_TTCONFIG_UPGRADE)
+#define CYTTSP5_TTCONFIG_UPGRADE 1
+#else
+#define CYTTSP5_TTCONFIG_UPGRADE 0
+#endif
 
 static const u8 cyttsp5_security_key[] = {
 	0xA5, 0x01, 0x02, 0x03, 0xFF, 0xFE, 0xFD, 0x5A
@@ -115,7 +121,7 @@ static inline struct cyttsp5_loader_data *cyttsp5_get_loader_data(
 	return cyttsp5_get_module_data(dev, &loader_module);
 }
 
-#if CYTTSP5_FW_UPGRADE \
+#if defined(CYTTSP5_FW_UPGRADE) \
 	|| defined(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_PLATFORM_TTCONFIG_UPGRADE)
 static u8 cyttsp5_get_panel_id(struct device *dev)
 {
@@ -125,7 +131,7 @@ static u8 cyttsp5_get_panel_id(struct device *dev)
 }
 #endif
 
-#if CYTTSP5_FW_UPGRADE || CYTTSP5_TTCONFIG_UPGRADE
+#if defined(CYTTSP5_FW_UPGRADE) || defined(CYTTSP5_TTCONFIG_UPGRADE)
 /*
  * return code:
  * -1: Do not upgrade firmware
@@ -230,7 +236,7 @@ static int cyttsp5_calibration_attention(struct device *dev)
 
 #endif /* CYTTSP5_FW_UPGRADE || CYTTSP5_TTCONFIG_UPGRADE */
 
-#if CYTTSP5_FW_UPGRADE
+#ifdef CYTTSP5_FW_UPGRADE
 static u8 *cyttsp5_get_row_(struct device *dev, u8 *row_buf,
 		u8 *image_buf, int size)
 {
@@ -826,7 +832,7 @@ exit:
 }
 #endif /* CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_BINARY_FW_UPGRADE */
 
-#if CYTTSP5_TTCONFIG_UPGRADE
+#ifdef CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_MANUAL_TTCONFIG_UPGRADE
 static int cyttsp5_write_config_row_(struct device *dev, u8 ebid,
 		u16 row_number, u16 row_size, u8 *data)
 {
@@ -967,9 +973,7 @@ exit:
 
 	return rc;
 }
-#endif /* CYTTSP5_TTCONFIG_UPGRADE */
 
-#ifdef CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_PLATFORM_TTCONFIG_UPGRADE
 static int cyttsp5_get_ttconfig_crc(struct device *dev,
 		const u8 *ttconfig_data, int ttconfig_size, u16 *crc)
 {
@@ -1358,7 +1362,7 @@ static void cyttsp5_fw_and_config_upgrade(
 	if (!ld->si)
 		dev_err(dev, "%s: Fail get sysinfo pointer from core\n",
 			__func__);
-#if !CYTTSP5_FW_UPGRADE
+#if !defined(CYTTSP5_FW_UPGRADE)
 	dev_info(dev, "%s: No FW upgrade method selected!\n", __func__);
 #endif
 
@@ -1378,7 +1382,7 @@ static void cyttsp5_fw_and_config_upgrade(
 #endif
 }
 
-#if CYTTSP5_FW_UPGRADE
+#ifdef CYTTSP5_FW_UPGRADE
 static int cyttsp5_fw_upgrade_cb(struct device *dev)
 {
 #ifdef CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_PLATFORM_FW_UPGRADE
@@ -1489,7 +1493,7 @@ static int cyttsp5_loader_probe(struct device *dev, void **data)
 	ld->dev = dev;
 	*data = ld;
 
-#if CYTTSP5_FW_UPGRADE
+#ifdef CYTTSP5_FW_UPGRADE
 	init_completion(&ld->int_running);
 #ifdef CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_BINARY_FW_UPGRADE
 	init_completion(&ld->builtin_bin_fw_complete);
@@ -1500,7 +1504,7 @@ static int cyttsp5_loader_probe(struct device *dev, void **data)
 	cmd->subscribe_attention(dev, CY_ATTEN_LOADER, CYTTSP5_LOADER_NAME,
 		cyttsp5_fw_upgrade_cb, CY_MODE_UNKNOWN);
 #endif
-#if CYTTSP5_FW_UPGRADE || CYTTSP5_TTCONFIG_UPGRADE
+#if defined(CYTTSP5_FW_UPGRADE) || defined(CYTTSP5_TTCONFIG_UPGRADE)
 	init_completion(&ld->calibration_complete);
 	INIT_WORK(&ld->calibration_work, cyttsp5_calibrate_idacs);
 #endif
@@ -1543,7 +1547,7 @@ static void cyttsp5_loader_release(struct device *dev, void *data)
 {
 	struct cyttsp5_loader_data *ld = (struct cyttsp5_loader_data *)data;
 
-#if CYTTSP5_FW_UPGRADE
+#ifdef CYTTSP5_FW_UPGRADE
 	cmd->unsubscribe_attention(dev, CY_ATTEN_IRQ, CYTTSP5_LOADER_NAME,
 		cyttsp5_loader_attention, CY_MODE_BOOTLOADER);
 
