@@ -1,6 +1,7 @@
 /*
 ** =============================================================================
 ** Copyright (c) 2016  Texas Instruments Inc.
+** Copyright (C) 2019 XiaoMi, Inc.
 **
 ** This program is free software; you can redistribute it and/or modify it under
 ** the terms of the GNU General Public License as published by the Free Software
@@ -41,7 +42,7 @@
 #include "tas2559-core.h"
 #include <soc/qcom/socinfo.h>
 
-#define TAS2559_CAL_NAME    "/persist/audio/tas2559_cal.bin"
+#define TAS2559_CAL_NAME    "/mnt/vendor/persist/audio/tas2559_cal.bin"
 #define RESTART_MAX 3
 
 static int tas2559_load_calibration(struct tas2559_priv *pTAS2559,
