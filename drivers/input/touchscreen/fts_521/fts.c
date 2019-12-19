@@ -148,7 +148,6 @@ static u8 key_mask;
 #ifdef CONFIG_INPUT_PRESS_NDT
 bool fts_fod_status;
 #endif
-extern void lpm_disable_for_input(bool on);
 extern spinlock_t fts_int;
 struct fts_ts_info *fts_info;
 
@@ -183,7 +182,6 @@ void release_all_touches(struct fts_ts_info *info)
 		input_report_abs(info->input_dev, ABS_MT_TRACKING_ID, -1);
 	}
 	input_sync(info->input_dev);
-	lpm_disable_for_input(false);
 	info->touch_id = 0;
 #ifdef STYLUS_MODE
 	info->stylus_id = 0;
@@ -2871,7 +2869,6 @@ static void fts_leave_pointer_event_handler(struct fts_ts_info *info,
 		input_report_key(info->input_dev, BTN_TOUCH, touch_condition);
 		if (!touch_condition)
 			input_report_key(info->input_dev, BTN_TOOL_FINGER, 0);
-		lpm_disable_for_input(false);
 	}
 	input_report_abs(info->input_dev, ABS_MT_TRACKING_ID, -1);
 	dev_dbg(info->dev,
@@ -3430,12 +3427,10 @@ static irqreturn_t fts_event_handler(int irq, void *ts_info)
 	}
 #endif
 
-	lpm_disable_for_input(true);
 	if (info->dev_pm_suspend) {
 		error = wait_for_completion_timeout(&info->dev_pm_suspend_completion, msecs_to_jiffies(700));
 		if (!error) {
 			logError(1, "%s system(i2c) can't finished resuming procedure, skip it", tag);
-			lpm_disable_for_input(false);
 			return IRQ_HANDLED;
 			}
 	}
@@ -3472,8 +3467,6 @@ static irqreturn_t fts_event_handler(int irq, void *ts_info)
 	}
 	input_sync(info->input_dev);
 	info->irq_status = false;
-	if (!info->touch_id)
-		lpm_disable_for_input(false);
 	return IRQ_HANDLED;
 }
 
