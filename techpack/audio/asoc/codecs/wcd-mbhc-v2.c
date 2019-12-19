@@ -1,5 +1,5 @@
 /* Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
- * Copyright (C) 2018 XiaoMi, Inc.
+ * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,6 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+#define DEBUG
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -34,12 +35,6 @@
 #include "wcd-mbhc-adc.h"
 #include "wcd-mbhc-v2-api.h"
 #include <soc/qcom/socinfo.h>
-
-#define SUBPCB_ID_NONE 0
-#define SUBPCB_ID_OLD 1
-#define SUBPCB_ID_NEW 2
-
-int subpcb_id_state;
 
 void wcd_mbhc_jack_report(struct wcd_mbhc *mbhc,
 			  struct snd_soc_jack *jack, int status, int mask)
@@ -221,6 +216,7 @@ static int wcd_event_notify(struct notifier_block *self, unsigned long val,
 	struct snd_soc_codec *codec = mbhc->codec;
 	bool micbias2 = false;
 	bool micbias1 = false;
+
 
 	pr_debug("%s: event %s (%d)\n", __func__,
 		 wcd_mbhc_get_event_string(event), event);
@@ -844,8 +840,6 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 	bool micbias1 = false;
 	struct snd_soc_codec *codec = mbhc->codec;
 	enum snd_jack_types jack_type;
-	struct usbc_ana_audio_config *config =
-		&mbhc->mbhc_cfg->usbc_analog_cfg;
 
 	dev_dbg(codec->dev, "%s: enter\n", __func__);
 	WCD_MBHC_RSC_LOCK(mbhc);
@@ -956,11 +950,6 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_ELECT_DETECTION_TYPE, 1);
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_ELECT_SCHMT_ISRC, 0);
 		mbhc->extn_cable_hph_rem = false;
-
-		if (config->usbc_en1_gpio_p) {
-			msm_cdc_pinctrl_select_sleep_state(config->usbc_en1_gpio_p);
-			pr_info("wcd_mbhc_swch_irq_handler: switch L/R to usb \n");
-		}
 		wcd_mbhc_report_plug(mbhc, 0, jack_type);
 
 	} else if (!detection_type) {
@@ -1502,13 +1491,21 @@ static int wcd_mbhc_usb_c_analog_setup_gpios(struct wcd_mbhc *mbhc,
 		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_MIC_CLAMP_CTL, 2);
 		mbhc->mbhc_cfg->enable_dual_adc_gpio(mbhc->mbhc_cfg->dual_adc_gpio_node, 0);
 
-		/* using hardware auto switch gnd and mic if support */
-		if (config->euro_us_hw_switch_gpio_p && (subpcb_id_state == SUBPCB_ID_OLD)) {
+#ifdef CONFIG_AUDIO_UART_DEBUG
+		if (get_hw_version_platform() == HARDWARE_PLATFORM_POLARIS) {
+			if (get_hw_version_major() == 0)
+				msm_cdc_pinctrl_select_active_state(config->uart_audio_switch_gpio_p);
+			else
+				msm_cdc_pinctrl_select_sleep_state(config->uart_audio_switch_gpio_p);
+		}
+#endif
+
+		/*using hardware auto switch gnd and mic if support*/
+		if (config->euro_us_hw_switch_gpio_p) {
 			msm_cdc_pinctrl_select_active_state(config->euro_us_hw_switch_gpio_p);
 			msleep(200);
 			pr_info("hardware auto switch enable\n");
 		}
-
 		if (config->usbc_en1_gpio_p)
 			rc = msm_cdc_pinctrl_select_active_state(
 				config->usbc_en1_gpio_p);
@@ -1525,10 +1522,18 @@ static int wcd_mbhc_usb_c_analog_setup_gpios(struct wcd_mbhc *mbhc,
 			msm_cdc_pinctrl_select_sleep_state(
 				config->usbc_force_gpio_p);
 
-		if (config->euro_us_hw_switch_gpio_p && (subpcb_id_state == SUBPCB_ID_OLD)) {
+		if (config->euro_us_hw_switch_gpio_p) {
 			msm_cdc_pinctrl_select_sleep_state(config->euro_us_hw_switch_gpio_p);
 			pr_info("hardware auto switch disable\n");
 		}
+#ifdef CONFIG_AUDIO_UART_DEBUG
+		if (get_hw_version_platform() == HARDWARE_PLATFORM_POLARIS) {
+			if (get_hw_version_major() == 0)
+				msm_cdc_pinctrl_select_sleep_state(config->uart_audio_switch_gpio_p);
+			else
+				msm_cdc_pinctrl_select_active_state(config->uart_audio_switch_gpio_p);
+		}
+#endif
 
 		mbhc->mbhc_cfg->enable_dual_adc_gpio(mbhc->mbhc_cfg->dual_adc_gpio_node, 1);
 
@@ -1543,7 +1548,6 @@ static int wcd_mbhc_usb_c_analog_setup_gpios(struct wcd_mbhc *mbhc,
 		}
 
 		mbhc->usbc_mode = POWER_SUPPLY_TYPEC_NONE;
-		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_MIC_CLAMP_CTL, 0);
 		if (mbhc->mbhc_cfg->swap_gnd_mic)
 			mbhc->mbhc_cfg->swap_gnd_mic(mbhc->codec, false);
 	}
@@ -1698,7 +1702,6 @@ int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 	struct usbc_ana_audio_config *config;
 	struct snd_soc_codec *codec;
 	struct snd_soc_card *card;
-	int subpcb_id;
 	const char *usb_c_dt = "qcom,msm-mbhc-usbc-audio-supported";
 
 	if (!mbhc || !mbhc_cfg)
@@ -1770,40 +1773,6 @@ int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 					&config->uart_audio_switch_gpio_p);
 			if (rc)
 				goto err;
-		}
-
-		if (of_find_property(card->dev->of_node,
-					"qcom,subpcb-id-gpio",
-					NULL)) {
-			rc = wcd_mbhc_init_gpio(mbhc, mbhc_cfg,
-					"qcom,subpcb-id-gpio",
-					&config->subpcb_id_gpio,
-					&config->subpcb_id_gpio_p);
-			if (rc)
-				goto err;
-			config->subpcb_id_gpio = of_get_named_gpio(
-					card->dev->of_node, "qcom,subpcb-id-gpio-num", 0);
-
-			if (!gpio_is_valid(config->subpcb_id_gpio)) {
-				pr_err("subpcb_id_gpio is invalid\n");
-				goto err;
-			}
-			subpcb_id = gpio_get_value_cansleep(config->subpcb_id_gpio);
-			pr_info("subpcb_id_gpio = %d, value1 = %d\n",
-					config->subpcb_id_gpio, subpcb_id);
-
-			if (subpcb_id == 0)
-				subpcb_id_state = SUBPCB_ID_NEW;
-			else
-				subpcb_id_state = SUBPCB_ID_OLD;
-
-			msm_cdc_pinctrl_select_active_state(
-					config->subpcb_id_gpio_p);
-
-			subpcb_id = gpio_get_value_cansleep(config->subpcb_id_gpio);
-			pr_info("subpcb_id_gpio = %d, value2 = %d\n",
-					config->subpcb_id_gpio, subpcb_id);
-
 		}
 
 		dev_dbg(mbhc->codec->dev, "%s: calling usb_c_analog_init\n",

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
- * Copyright (C) 2018 XiaoMi, Inc.
+ * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -2958,36 +2958,36 @@ static int msm_qos_ctl_put(struct snd_kcontrol *kcontrol,
 }
 
 static int ultrasound_power_get(struct snd_kcontrol *kcontrol,
-				struct snd_ctl_elem_value *ucontrol)
+                               struct snd_ctl_elem_value *ucontrol)
 {
-	ucontrol->value.integer.value[0] = ultrasound_power_state;
-	return 0;
+       ucontrol->value.integer.value[0] = ultrasound_power_state;
+       return 0;
 }
 
 static int ultrasound_power_put(struct snd_kcontrol *kcontrol,
-			struct snd_ctl_elem_value *ucontrol)
+                               struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
-	struct snd_soc_card *card = codec->component.card;
-	struct msm_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
-	int ret;
+       struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+       struct snd_soc_card *card = codec->component.card;
+       struct msm_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
+       int ret;
 
-	ultrasound_power_state = ucontrol->value.integer.value[0];
-	pr_debug("%s: ultrasound power %d\n", __func__, ultrasound_power_state);
+       ultrasound_power_state = ucontrol->value.integer.value[0];
+       pr_debug("%s: ultrasound power %d\n", __func__, ultrasound_power_state);
 
-	if (ultrasound_power_state == 1) {
-		if (pdata->us_p_power)
-			ret = regulator_enable(pdata->us_p_power);
-		if (pdata->us_n_power)
-			ret = regulator_enable(pdata->us_n_power);
-	} else {
-		if (pdata->us_p_power)
-			ret = regulator_disable(pdata->us_p_power);
-		if (pdata->us_n_power)
-			ret = regulator_disable(pdata->us_n_power);
-	}
+       if (ultrasound_power_state == 1) {
+               if (pdata->us_p_power)
+                       ret = regulator_enable(pdata->us_p_power);
+               if (pdata->us_n_power)
+                       ret = regulator_enable(pdata->us_n_power);
+       } else {
+               if (pdata->us_p_power)
+                       ret = regulator_disable(pdata->us_p_power);
+               if (pdata->us_n_power)
+                       ret = regulator_disable(pdata->us_n_power);
+       }
 
-	return 0;
+       return 0;
 }
 
 static int usbhs_direction_get(struct snd_kcontrol *kcontrol,
@@ -3004,18 +3004,15 @@ static int usbhs_direction_get(struct snd_kcontrol *kcontrol,
 		card = codec->component.card;
 		if (card) {
 			pdata = snd_soc_card_get_drvdata(card);
-			if (pdata) {
+			if (pdata){
 				if (pdata->usbc_en2_gpio_p) {
-					ucontrol->value.integer.value[0] =
-						gpio_get_value_cansleep(pdata->usbc_en2_gpio);
+					ucontrol->value.integer.value[0] = gpio_get_value_cansleep(pdata->usbc_en2_gpio);
 				} else if (pdata->usbc_en2_gpio > 0) {
-					ucontrol->value.integer.value[0] =
-						gpio_get_value_cansleep(pdata->usbc_en2_gpio);
+					ucontrol->value.integer.value[0] = gpio_get_value_cansleep(pdata->usbc_en2_gpio);
 				}
 			}
 		}
 	}
-
 	return 0;
 }
 
@@ -3027,8 +3024,6 @@ static const struct snd_kcontrol_new msm_snd_controls[] = {
 	SOC_ENUM_EXT("SLIM_0_TX Channels", slim_0_tx_chs,
 			msm_slim_tx_ch_get, msm_slim_tx_ch_put),
 	SOC_ENUM_EXT("SLIM_1_TX Channels", slim_1_tx_chs,
-			msm_slim_tx_ch_get, msm_slim_tx_ch_put),
-	SOC_ENUM_EXT("SLIM_3_TX Channels", slim_3_tx_chs,
 			msm_slim_tx_ch_get, msm_slim_tx_ch_put),
 	SOC_ENUM_EXT("SLIM_5_RX Channels", slim_5_rx_chs,
 			msm_slim_rx_ch_get, msm_slim_rx_ch_put),
@@ -3052,8 +3047,6 @@ static const struct snd_kcontrol_new msm_snd_controls[] = {
 			slim_rx_bit_format_get, slim_rx_bit_format_put),
 	SOC_ENUM_EXT("SLIM_0_TX Format", slim_0_tx_format,
 			slim_tx_bit_format_get, slim_tx_bit_format_put),
-	SOC_ENUM_EXT("SLIM_3_TX Format", slim_3_tx_format,
-			slim_tx_bit_format_get, slim_tx_bit_format_put),
 	SOC_ENUM_EXT("USB_AUDIO_RX Format", usb_rx_format,
 			usb_audio_rx_format_get, usb_audio_rx_format_put),
 	SOC_ENUM_EXT("USB_AUDIO_TX Format", usb_tx_format,
@@ -3065,8 +3058,6 @@ static const struct snd_kcontrol_new msm_snd_controls[] = {
 	SOC_ENUM_EXT("SLIM_2_RX SampleRate", slim_2_rx_sample_rate,
 			slim_rx_sample_rate_get, slim_rx_sample_rate_put),
 	SOC_ENUM_EXT("SLIM_0_TX SampleRate", slim_0_tx_sample_rate,
-			slim_tx_sample_rate_get, slim_tx_sample_rate_put),
-	SOC_ENUM_EXT("SLIM_3_TX SampleRate", slim_3_tx_sample_rate,
 			slim_tx_sample_rate_get, slim_tx_sample_rate_put),
 	SOC_ENUM_EXT("SLIM_5_RX SampleRate", slim_5_rx_sample_rate,
 			slim_rx_sample_rate_get, slim_rx_sample_rate_put),
@@ -3274,9 +3265,15 @@ static const struct snd_kcontrol_new msm_snd_controls[] = {
 	SOC_ENUM_EXT("Ultrasound Power", ultrasound_power,
 			ultrasound_power_get, ultrasound_power_put),
 	SOC_SINGLE_EXT("USB Headset Direction", 0, 0, UINT_MAX, 0,
-			usbhs_direction_get, NULL),
+					usbhs_direction_get, NULL),
 	SOC_SINGLE_MULTI_EXT("TDM Slot Map", SND_SOC_NOPM, 0, 255, 0, 4,
 	NULL, tdm_slot_map_put),
+	SOC_ENUM_EXT("SLIM_3_TX Channels", slim_3_tx_chs,
+			msm_slim_tx_ch_get, msm_slim_tx_ch_put),
+	SOC_ENUM_EXT("SLIM_3_TX Format", slim_3_tx_format,
+			slim_tx_bit_format_get, slim_tx_bit_format_put),
+	SOC_ENUM_EXT("SLIM_3_TX SampleRate", slim_3_tx_sample_rate,
+			slim_tx_sample_rate_get, slim_tx_sample_rate_put),
 };
 
 static int msm_snd_enable_codec_ext_clk(struct snd_soc_codec *codec,
@@ -3375,6 +3372,15 @@ static int msm_hifi_ctrl_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+/*
+static int external_amic2_sel_get(struct snd_kcontrol *kcontrol,
+                               struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = amic2_sel_state;
+	return 0;
+}
+*/
+
 static void external_enable_dual_adc_gpio(struct device_node *np, bool val)
 {
 	if (!np)
@@ -3389,17 +3395,8 @@ static void external_enable_dual_adc_gpio(struct device_node *np, bool val)
 	}
 }
 
-/*
-static int external_amic2_sel_get(struct snd_kcontrol *kcontrol,
-				struct snd_ctl_elem_value *ucontrol)
-{
-	ucontrol->value.integer.value[0] = amic2_sel_state;
-	return 0;
-}
-*/
-
 static int external_amic2_sel_put(struct snd_kcontrol *kcontrol,
-				struct snd_ctl_elem_value *ucontrol)
+                               struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_dapm_context *dapm = snd_soc_dapm_kcontrol_dapm(kcontrol);
 	struct snd_soc_card *card = dapm->card;
@@ -3454,13 +3451,13 @@ static const struct snd_soc_dapm_widget msm_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("Headset Mic2", NULL),
 };
 
-static const struct snd_soc_dapm_widget sdm845_xiaomi_dapm_widgets[] = {
+static const struct snd_soc_dapm_widget sdm845_polaris_dapm_widgets[] = {
 	SND_SOC_DAPM_MUX("External AMIC2 Mux", SND_SOC_NOPM, 0, 0, &ext_amc2_mux),
 	SND_SOC_DAPM_INPUT("AMIC2_EXT_0"),
 	SND_SOC_DAPM_INPUT("AMIC2_EXT_1"),
 };
 
-static const struct snd_soc_dapm_route sdm845_xiaomi_dapm_routes[] = {
+static const struct snd_soc_dapm_route sdm845_polaris_dapm_routes[] = {
 	{"AMIC2", NULL, "External AMIC2 Mux"},
 	{"External AMIC2 Mux", "default", "AMIC2_EXT_0"},
 	{"External AMIC2 Mux", "Dual_ADC", "AMIC2_EXT_1"},
@@ -3890,11 +3887,11 @@ static bool msm_usbc_swap_gnd_mic(struct snd_soc_codec *codec, bool active)
 {
 	int value = 0;
 	bool ret = 0;
-	int old_value;
 	struct snd_soc_card *card = codec->component.card;
 	struct msm_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
 	struct pinctrl_state *en2_pinctrl_active;
 	struct pinctrl_state *en2_pinctrl_sleep;
+	int oldv;
 
 	if (!pdata->usbc_en2_gpio_p) {
 		if (active) {
@@ -3945,17 +3942,8 @@ static bool msm_usbc_swap_gnd_mic(struct snd_soc_codec *codec, bool active)
 	/* if active and usbc_en2_gpio_p defined, swap using usbc_en2_gpio_p */
 	if (active) {
 		dev_dbg(codec->dev, "%s: enter\n", __func__);
-		old_value = tavil_mb_pull_down(codec, true, 0);
-		if (wcd_mbhc_cfg.usbc_analog_cfg.euro_us_hw_switch_gpio_p) {
-			value = gpio_get_value_cansleep(pdata->usbc_en2_gpio);
-			if (value)
-				msm_cdc_pinctrl_select_sleep_state(wcd_mbhc_cfg.
-						usbc_analog_cfg.euro_us_hw_switch_gpio_p);
-			else
-				msm_cdc_pinctrl_select_active_state(wcd_mbhc_cfg.
-						usbc_analog_cfg.euro_us_hw_switch_gpio_p);
-		}
-		else if (pdata->usbc_en2_gpio_p) {
+		oldv = tavil_mb_pull_down(codec, true, 0);
+		if (pdata->usbc_en2_gpio_p) {
 			value = gpio_get_value_cansleep(pdata->usbc_en2_gpio);
 			if (value)
 				pinctrl_select_state(pdata->usbc_en2_gpio_p,
@@ -3967,8 +3955,8 @@ static bool msm_usbc_swap_gnd_mic(struct snd_soc_codec *codec, bool active)
 			value = gpio_get_value_cansleep(pdata->usbc_en2_gpio);
 			gpio_set_value_cansleep(pdata->usbc_en2_gpio, !value);
 		}
-		tavil_mb_pull_down(codec, false, old_value);
-		pr_debug("%s: swap select switch %d to %d\n", __func__,
+		tavil_mb_pull_down(codec, false, oldv);
+		pr_info("%s: swap select switch %d to %d\n", __func__,
 			value, !value);
 		ret = true;
 	} else {
@@ -4234,16 +4222,16 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 				ARRAY_SIZE(wcd_audio_paths));
 
 	if (get_hw_version_platform() == HARDWARE_PLATFORM_POLARIS ||
-			get_hw_version_platform() == HARDWARE_PLATFORM_DIPPERN ||
-			get_hw_version_platform() == HARDWARE_PLATFORM_URSA ||
-			get_hw_version_platform() == HARDWARE_PLATFORM_EQUULEUS ||
-			get_hw_version_platform() == HARDWARE_PLATFORM_PERSEUS) {
+		get_hw_version_platform() == HARDWARE_PLATFORM_DIPPERN ||
+		get_hw_version_platform() == HARDWARE_PLATFORM_URSA ||
+		get_hw_version_platform() == HARDWARE_PLATFORM_EQUULEUS ||
+		get_hw_version_platform() == HARDWARE_PLATFORM_PERSEUS) {
 		pr_info("add the External AMIC2 Mux\n");
-		snd_soc_dapm_new_controls(dapm, sdm845_xiaomi_dapm_widgets,
-				ARRAY_SIZE(sdm845_xiaomi_dapm_widgets));
+		snd_soc_dapm_new_controls(dapm, sdm845_polaris_dapm_widgets,
+				ARRAY_SIZE(sdm845_polaris_dapm_widgets));
 
-		snd_soc_dapm_add_routes(dapm, sdm845_xiaomi_dapm_routes,
-				ARRAY_SIZE(sdm845_xiaomi_dapm_routes));
+		snd_soc_dapm_add_routes(dapm, sdm845_polaris_dapm_routes,
+				ARRAY_SIZE(sdm845_polaris_dapm_routes));
 	}
 
 	snd_soc_dapm_ignore_suspend(dapm, "Handset Mic");
@@ -7019,16 +7007,16 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 			       sizeof(msm_mi2s_be_dai_links));
 			total_links += ARRAY_SIZE(msm_mi2s_be_dai_links);
 
-			if (get_hw_version_platform() == HARDWARE_PLATFORM_DIPPERN ||
-					get_hw_version_platform() == HARDWARE_PLATFORM_URSA ||
-					get_hw_version_platform() == HARDWARE_PLATFORM_EQUULEUS ||
-					get_hw_version_platform() == HARDWARE_PLATFORM_PERSEUS) {
+			if ((get_hw_version_platform() == HARDWARE_PLATFORM_DIPPERN) ||
+				(get_hw_version_platform() == HARDWARE_PLATFORM_URSA) ||
+				(get_hw_version_platform() == HARDWARE_PLATFORM_EQUULEUS) ||
+				(get_hw_version_platform() == HARDWARE_PLATFORM_PERSEUS)) {
 				memcpy(msm_tavil_snd_card_dai_links + total_links,
 						msm_quat_mi2s_tas2557_dai_links,
 						sizeof(msm_quat_mi2s_tas2557_dai_links));
 				total_links += ARRAY_SIZE(msm_quat_mi2s_tas2557_dai_links);
-			} else if (get_hw_version_platform() == HARDWARE_PLATFORM_POLARIS ||
-					get_hw_version_platform() == HARDWARE_PLATFORM_BERYLLIUM) {
+			} else if ((get_hw_version_platform() == HARDWARE_PLATFORM_POLARIS) ||
+			(get_hw_version_platform() == HARDWARE_PLATFORM_BERYLLIUM)) {
 				memcpy(msm_tavil_snd_card_dai_links + total_links,
 						msm_quat_mi2s_tas2559_dai_links,
 						sizeof(msm_quat_mi2s_tas2559_dai_links));
@@ -7526,6 +7514,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		if (ret)
 			dev_err(&pdev->dev, "msm_prepare_us_euro failed (%d)\n",
 				ret);
+
 	}
 
 	/* Parse pinctrl info from devicetree */
