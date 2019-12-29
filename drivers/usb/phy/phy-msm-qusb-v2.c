@@ -703,15 +703,15 @@ static int qusb_phy_init(struct usb_phy *phy)
 							(4 * p_index));
 	}
 
-        if (qphy->imp_ctrl)
-                writel_relaxed(qphy->imp_ctrl, qphy->base + 0x220);
+	if (qphy->imp_ctrl)
+		writel_relaxed(qphy->imp_ctrl, qphy->base + 0x220);
 
-        if (qphy->tune_pll_bias)
-                writel_relaxed(qphy->tune_pll_bias, qphy->base + 0x198);
-        if (qphy->pll_bias)
-                writel_relaxed(qphy->pll_bias, qphy->base + 0x198);
+	if (qphy->tune_pll_bias)
+		writel_relaxed(qphy->tune_pll_bias, qphy->base + 0x198);
+	if (qphy->pll_bias)
+		writel_relaxed(qphy->pll_bias, qphy->base + 0x198);
 
-        /* set the PLL BIAS via dtsi
+	/* set the PLL BIAS via dtsi
 	if (qphy->refgen_north_bg_reg && qphy->override_bias_ctrl2)
 		if (readl_relaxed(qphy->refgen_north_bg_reg) & BANDGAP_BYPASS)
 			writel_relaxed(BIAS_CTRL_2_OVERRIDE_VAL,
