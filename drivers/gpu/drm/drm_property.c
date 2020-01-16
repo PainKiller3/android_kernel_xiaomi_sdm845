@@ -559,7 +559,7 @@ drm_property_create_blob(struct drm_device *dev, size_t length,
 
 	if (!length || length > MAX_BLOB_PROP_SIZE -
 				sizeof(struct drm_property_blob))
-		return ERR_PTR(-EINVAL);
+	return ERR_PTR(-EINVAL);
 
 	blob = vzalloc(sizeof(struct drm_property_blob)+length);
 	if (!blob)
