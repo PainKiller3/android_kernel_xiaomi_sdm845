@@ -479,4 +479,15 @@ depends on (ARCH_QCOM && OF) || COMPILE_TEST
 source "drivers/thermal/qcom/Kconfig"
 endmenu
 
+config THERMAL_SUSPEND_RESUME
+	tristate "Switch thermals on suspend"
+	depends on THERMAL
+	help
+	  Small API to switch thermals when screen turns off to prevent 
+	  Random Reboots or Blackscreens. A userspace knob is still given
+	  to the user to select which thermals to apply on screen off.
+
+	  If in doubt, say N.
+
+
 endif

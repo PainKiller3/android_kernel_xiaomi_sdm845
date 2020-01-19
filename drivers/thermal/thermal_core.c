@@ -39,6 +39,7 @@
 #include <net/netlink.h>
 #include <net/genetlink.h>
 #include <linux/suspend.h>
+#include <linux/moduleparam.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/thermal.h>
@@ -85,6 +86,12 @@ struct screen_monitor sm;
 static atomic_t switch_mode = ATOMIC_INIT(-1);
 static atomic_t temp_state = ATOMIC_INIT(0);
 static char boost_buf[128];
+
+#ifdef CONFIG_THERMAL_SUSPEND_RESUME
+static int prev_sconfig = 10;
+static int suspend_sconfig = -1;
+module_param(suspend_sconfig, int, 0644);
+#endif
 
 static struct thermal_governor *__find_governor(const char *name)
 {
@@ -2708,6 +2715,23 @@ thermal_sconfig_store(struct device *dev,
 static DEVICE_ATTR(sconfig, 0664,
 		   thermal_sconfig_show, thermal_sconfig_store);
 
+#ifdef CONFIG_THERMAL_SUSPEND_RESUME
+void thermal_sconfig_suspend(void){
+	prev_sconfig = atomic_read(&switch_mode);
+	if (suspend_sconfig < -1 || suspend_sconfig > THERMAL_MAX_ACTIVE){
+		pr_err("NGK::THERMAL::SUSPEND::suspend_sconfig out of range %d", suspend_sconfig);
+		suspend_sconfig = -1;
+	}
+	atomic_set(&switch_mode, suspend_sconfig);
+	pr_err("NGK::THERMAL::SUSPEND::suspend_sconfig %d", suspend_sconfig);
+}
+
+void thermal_sconfig_resume(void){
+	atomic_set(&switch_mode, prev_sconfig);
+	pr_err("NGK::THERMAL::RESUME::prev_sconfig %d", prev_sconfig);
+}
+#endif
+
 static ssize_t
 thermal_boost_show(struct device *dev,
 				      struct device_attribute *attr, char *buf)
@@ -2809,10 +2833,16 @@ static int screen_state_for_thermal_callback(struct notifier_block *nb, unsigned
 	case DRM_BLANK_POWERDOWN:
 		sm.screen_state = 0;
 		pr_warn("%s: DRM_BLANK_POWERDOWN\n", __func__);
+#ifdef CONFIG_THERMAL_SUSPEND_RESUME
+		thermal_sconfig_suspend();
+#endif
 		break;
 	case DRM_BLANK_UNBLANK:
 		sm.screen_state = 1;
 		pr_warn("%s: DRM_BLANK_UNBLANK\n", __func__);
+#ifdef CONFIG_THERMAL_SUSPEND_RESUME
+		thermal_sconfig_resume();
+#endif
 		break;
 	default:
 		break;
