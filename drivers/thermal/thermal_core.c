@@ -2722,16 +2722,13 @@ static DEVICE_ATTR(sconfig, 0664,
 void thermal_sconfig_suspend(void){
 	prev_sconfig = atomic_read(&switch_mode);
 	if (suspend_sconfig < -1 || suspend_sconfig > THERMAL_MAX_ACTIVE){
-		pr_err("NGK::THERMAL::SUSPEND::suspend_sconfig out of range %d", suspend_sconfig);
 		suspend_sconfig = -1;
 	}
 	atomic_set(&switch_mode, suspend_sconfig);
-	pr_err("NGK::THERMAL::SUSPEND::suspend_sconfig %d", suspend_sconfig);
 }
 
 void thermal_sconfig_resume(void){
 	atomic_set(&switch_mode, prev_sconfig);
-	pr_err("NGK::THERMAL::RESUME::prev_sconfig %d", prev_sconfig);
 }
 #endif
 
