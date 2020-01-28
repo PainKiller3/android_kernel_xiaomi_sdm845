@@ -1071,22 +1071,21 @@ static void nvt_ts_work_func(void)
 		ret = wait_for_completion_timeout(&ts->dev_pm_suspend_completion, msecs_to_jiffies(500));
 		if (!ret) {
 			NVT_ERR("system(i2c) can't finished resuming procedure, skip it\n");
-			goto XFER_ERROR;
+			goto out;
 		}
 	}
 
 	ret = CTP_I2C_READ(ts->client, I2C_FW_Address, point_data, POINT_DATA_LEN + 1);
 	if (unlikely(ret < 0)) {
 		NVT_ERR("CTP_I2C_READ failed.(%d)\n", ret);
-		goto XFER_ERROR;
+		goto out;
 	}
 
 #if WAKEUP_GESTURE
 	if (unlikely(bTouchIsAwake == 0)) {
 		input_id = (uint8_t)(point_data[1] >> 3);
 		nvt_ts_wakeup_gesture_report(input_id, point_data);
-		goto XFER_ERROR;
-		return;
+		goto out;
 	}
 #endif
 
@@ -1174,8 +1173,8 @@ static void nvt_ts_work_func(void)
 XFER_ERROR:
 	input_sync(ts->input_dev);
 
+out:
 	enable_irq(ts->client->irq);
-
 	mutex_unlock(&ts->lock);
 }
 
