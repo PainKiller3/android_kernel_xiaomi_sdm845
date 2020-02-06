@@ -181,7 +181,7 @@ static void fg_encode_default(struct fg_sram_param *sp,
 static struct fg_irq_info fg_irqs[FG_IRQ_MAX];
 
 #ifdef CONFIG_CHARGE_BOOST
-bool charge_boost_enabled = true;
+bool charge_boost_enabled = false;
 module_param(charge_boost_enabled, bool, 0644);
 #endif
 
