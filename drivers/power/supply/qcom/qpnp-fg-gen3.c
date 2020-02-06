@@ -26,6 +26,10 @@
 #include <linux/ktime.h>
 #include <linux/qpnp/qpnp-revid.h>
 #include <linux/qpnp/qpnp-misc.h>
+#ifdef CONFIG_CHARGE_BOOST
+#include <linux/cpu_input_boost.h>
+#include <linux/module.h>
+#endif
 #include "fg-core.h"
 #include "fg-reg.h"
 #include "step-chg-jeita.h"
@@ -175,6 +179,11 @@ static void fg_encode_default(struct fg_sram_param *sp,
 	enum fg_sram_param_id id, int val, u8 *buf);
 
 static struct fg_irq_info fg_irqs[FG_IRQ_MAX];
+
+#ifdef CONFIG_CHARGE_BOOST
+bool charge_boost_enabled = true;
+module_param(charge_boost_enabled, bool, 0644);
+#endif
 
 #define PARAM(_id, _addr_word, _addr_byte, _len, _num, _den, _offset,	\
 	      _enc, _dec)						\
@@ -1608,6 +1617,16 @@ static void fg_cap_learning_update(struct fg_chip *chip)
 	bool prime_cc = false;
 
 	mutex_lock(&chip->cl.lock);
+
+#ifdef CONFIG_CHARGE_BOOST
+	if (charge_boost_enabled) {
+	if (chip->charge_status == POWER_SUPPLY_STATUS_CHARGING ||
+	chip->charge_status == POWER_SUPPLY_STATUS_FULL) {
+    	   	cpu_input_boost_kick_max(50000);
+		pr_info("Charge boost kicked in\n");
+	}
+	}
+#endif
 
 	if (!is_temp_valid_cap_learning(chip) || !chip->cl.learned_cc_uah ||
 		chip->battery_missing) {

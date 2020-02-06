@@ -521,6 +521,13 @@ config NX30P6093
 	  usb_psy to disable CC detection on the event of any water/debris
 	  detected at USBIN.
 
+config CHARGE_BOOST
+	bool "Charge boost"
+	default n
+	depends on CPU_INPUT_BOOST
+	help
+	  Boosts the CPU when the power supply is plugged in and charging or fully charged.
+
 source "drivers/power/supply/qcom/Kconfig"
 
 endif # POWER_SUPPLY
