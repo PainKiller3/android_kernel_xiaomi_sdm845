@@ -1,0 +1,13 @@
+ {
+  "kernel": {
+    "name": "SilverCore Kernel Beryllium",
+    "version": "v2.6",
+    "link": "",
+    "changelog_url": "",
+    "date": "2020-02-15",
+    "sha1": ""
+  },
+  "support": {
+    "link": "https://t.me/reignzupdate"
+  }
+}
