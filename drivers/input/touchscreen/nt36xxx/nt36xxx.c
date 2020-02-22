@@ -1514,14 +1514,14 @@ err_pinctrl_get:
 	return retval;
 }
 
-static ssize_t nvt_panel_wake_gesture_show(struct device *dev,
+static ssize_t nvt_panel_gesture_enable_show(struct device *dev,
 				     struct device_attribute *attr, char *buf)
 {
         const char c = ts->gesture_enabled ? '1' : '0';
         return sprintf(buf, "%c\n", c);
 }
 
-static ssize_t nvt_panel_wake_gesture_store(struct device *dev,
+static ssize_t nvt_panel_gesture_enable_store(struct device *dev,
 				     struct device_attribute *attr, const char *buf, size_t count)
 {
 	int i;
@@ -1530,16 +1530,16 @@ static ssize_t nvt_panel_wake_gesture_store(struct device *dev,
 		ts->gesture_enabled = i;
 		return count;
 	} else {
-		dev_dbg(dev, "enable_dt2w write error\n");
+		dev_dbg(dev, "gesture_enable write error\n");
 		return -EINVAL;
 	}
 }
 
-static DEVICE_ATTR(wake_gesture, S_IWUSR | S_IRUSR,
-		nvt_panel_wake_gesture_show, nvt_panel_wake_gesture_store);
+static DEVICE_ATTR(gesture_enable, S_IWUSR | S_IRUSR,
+		nvt_panel_gesture_enable_show, nvt_panel_gesture_enable_store);
 
 static struct attribute *nvt_attr_group[] = {
-	&dev_attr_wake_gesture.attr,
+	&dev_attr_gesture_enable.attr,
 	NULL,
 };
 
