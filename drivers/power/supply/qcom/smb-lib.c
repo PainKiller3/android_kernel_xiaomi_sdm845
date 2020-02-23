@@ -1,5 +1,5 @@
 /* Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
- * Copyright (C) 2018 XiaoMi, Inc.
+ * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1011,11 +1011,9 @@ int smblib_rerun_apsd_if_required(struct smb_charger *chg)
 	if (!val.intval)
 		return 0;
 
-	/*
-	rc = smblib_request_dpdm(chg, true);
+	/*rc = smblib_request_dpdm(chg, true);
 	if (rc < 0)
-		smblib_err(chg, "Couldn't to enable DPDM rc=%d\n", rc);
-	*/
+		smblib_err(chg, "Couldn't to enable DPDM rc=%d\n", rc);*/
 
 	chg->uusb_apsd_rerun_done = true;
 
@@ -2102,8 +2100,10 @@ int smblib_get_prop_batt_status(struct smb_charger *chg,
 				union power_supply_propval *val)
 {
 	union power_supply_propval pval = {0, };
-	bool usb_online, dc_online, qnovo_en;
-	u8 stat, pt_en_cmd;
+	bool usb_online, dc_online;
+	/*bool qnovo_en;*/
+	/*u8 pt_en_cmd;*/
+	u8 stat;
 	int rc;
 
 	rc = smblib_get_prop_usb_online(chg, &pval);
@@ -2138,9 +2138,16 @@ int smblib_get_prop_batt_status(struct smb_charger *chg,
 	rc = smblib_get_prop_batt_health(chg, &pval);
 	if (rc < 0)
 		smblib_err(chg, "Couldn't get batt health rc=%d\n", rc);
-
-	/* this is a workaround to support type-c adapter without PD */
-	if (chg->typec_en_dis_active && pval.intval != POWER_SUPPLY_HEALTH_OVERHEAT
+	if (get_client_vote_locked(chg->usb_icl_votable, JEITA_VOTER) == 0) {
+		/* show charging when JEITA_VOTER 0mA is vote to improve user experience */
+		if (pval.intval != POWER_SUPPLY_HEALTH_OVERHEAT
+				&& pval.intval != POWER_SUPPLY_HEALTH_COLD) {
+			val->intval = POWER_SUPPLY_STATUS_CHARGING;
+			return 0;
+		}
+	}
+	/*this is a workaround to support type-c apapter without PD*/
+	if ( chg->typec_en_dis_active && pval.intval != POWER_SUPPLY_HEALTH_OVERHEAT
 					&& pval.intval != POWER_SUPPLY_HEALTH_COLD)
 	{
 		val->intval = POWER_SUPPLY_STATUS_CHARGING;
@@ -2175,7 +2182,7 @@ int smblib_get_prop_batt_status(struct smb_charger *chg,
 			|| pval.intval == POWER_SUPPLY_HEALTH_WARM)
 		return 0;
 
-	rc = smblib_read(chg, BATTERY_CHARGER_STATUS_7_REG, &stat);
+	/*rc = smblib_read(chg, BATTERY_CHARGER_STATUS_7_REG, &stat);
 	if (rc < 0) {
 		smblib_err(chg, "Couldn't read BATTERY_CHARGER_STATUS_7 rc=%d\n",
 				rc);
@@ -2194,10 +2201,10 @@ int smblib_get_prop_batt_status(struct smb_charger *chg,
 
 	qnovo_en = (bool)(pt_en_cmd & QNOVO_PT_ENABLE_CMD_BIT);
 
-	/* ignore stat7 when qnovo is enabled */
+	 ignore stat7 when qnovo is enabled
 	if (!qnovo_en && !stat)
 		val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
-
+	*/
 	return 0;
 }
 
@@ -2258,7 +2265,7 @@ int smblib_get_prop_batt_health(struct smb_charger *chg,
 			 * If Vbatt is within 40mV above Vfloat, then don't
 			 * treat it as overvoltage.
 			 */
-			effective_fv_uv = get_effective_result(chg->fv_votable);
+			effective_fv_uv = get_effective_result_locked(chg->fv_votable);
 			if (pval.intval >= effective_fv_uv + 40000) {
 				val->intval = POWER_SUPPLY_HEALTH_OVERVOLTAGE;
 				smblib_err(chg, "battery over-voltage vbat_fg = %duV, fv = %duV\n",
@@ -3035,7 +3042,6 @@ int smblib_get_prop_usb_online(struct smb_charger *chg,
 		val->intval = true;
 		return rc;
 	}
-
 	if (chg->typec_en_dis_active) {
 		val->intval = 1;
 		return 0;
@@ -4650,15 +4656,15 @@ static void smblib_hvdcp_adaptive_voltage_change(struct smb_charger *chg)
 }
 
 struct quick_charge adapter_cap[10] = {
-	{ POWER_SUPPLY_TYPE_USB,			QUICK_CHARGE_NORMAL },
-	{ POWER_SUPPLY_TYPE_USB_DCP,		QUICK_CHARGE_NORMAL },
-	{ POWER_SUPPLY_TYPE_USB_CDP,		QUICK_CHARGE_NORMAL },
-	{ POWER_SUPPLY_TYPE_USB_ACA,		QUICK_CHARGE_NORMAL },
-	{ POWER_SUPPLY_TYPE_USB_FLOAT,		QUICK_CHARGE_NORMAL },
-	{ POWER_SUPPLY_TYPE_USB_PD,			QUICK_CHARGE_FAST },
-	{ POWER_SUPPLY_TYPE_USB_HVDCP,		QUICK_CHARGE_FAST },
-	{ POWER_SUPPLY_TYPE_USB_HVDCP_3,	QUICK_CHARGE_FAST },
-	{ POWER_SUPPLY_TYPE_WIRELESS,		QUICK_CHARGE_FAST },
+	{ POWER_SUPPLY_TYPE_USB,        QUICK_CHARGE_NORMAL },
+	{ POWER_SUPPLY_TYPE_USB_DCP,    QUICK_CHARGE_NORMAL },
+	{ POWER_SUPPLY_TYPE_USB_CDP,    QUICK_CHARGE_NORMAL },
+	{ POWER_SUPPLY_TYPE_USB_ACA,    QUICK_CHARGE_NORMAL },
+	{ POWER_SUPPLY_TYPE_USB_FLOAT,  QUICK_CHARGE_NORMAL },
+	{ POWER_SUPPLY_TYPE_USB_PD,       QUICK_CHARGE_FAST },
+	{ POWER_SUPPLY_TYPE_USB_HVDCP,    QUICK_CHARGE_FAST },
+	{ POWER_SUPPLY_TYPE_USB_HVDCP_3,  QUICK_CHARGE_FAST },
+	{ POWER_SUPPLY_TYPE_WIRELESS,     QUICK_CHARGE_FAST },
 	{0, 0},
 };
 
@@ -4679,15 +4685,17 @@ int smblib_get_quick_charge_type(struct smb_charger *chg)
 	if (pval.intval == POWER_SUPPLY_STATUS_DISCHARGING)
 		return 0;
 
-	if ((chg->real_charger_type == POWER_SUPPLY_TYPE_USB_PD) && chg->pd_verifed)
+	if ((chg->real_charger_type == POWER_SUPPLY_TYPE_USB_PD) && chg->pd_verifed) {
 		return QUICK_CHARGE_TURBE;
+	}
 
 	if (chg->is_qc_class_b)
 		return QUICK_CHARGE_FLASH;
 
 	while (adapter_cap[i].adap_type != 0) {
-		if (chg->real_charger_type == adapter_cap[i].adap_type)
+		if (chg->real_charger_type == adapter_cap[i].adap_type) {
 			return adapter_cap[i].adap_cap;
+		}
 		i++;
 	}
 
@@ -5516,8 +5524,7 @@ static void smblib_handle_typec_cc_state_change(struct smb_charger *chg)
 				smblib_wireless_set_enable(chg, false);
 		}
 		smblib_handle_typec_insertion(chg);
-		schedule_delayed_work(&chg->charger_type_recheck,
-								msecs_to_jiffies(20000));
+		schedule_delayed_work(&chg->charger_type_recheck, msecs_to_jiffies(20000));
 		schedule_delayed_work(&chg->connector_health_work, 0);
 	} else if (chg->typec_present &&
 				chg->typec_mode == POWER_SUPPLY_TYPEC_NONE) {
@@ -5528,8 +5535,7 @@ static void smblib_handle_typec_cc_state_change(struct smb_charger *chg)
 		smblib_dbg(chg, PR_MISC, "TypeC removal\n");
 		smblib_handle_typec_removal(chg);
 
-		if (!usb_present)
-			smblib_wireless_set_enable(chg, true);
+		smblib_wireless_set_enable(chg, true);
 	}
 
 	/* suspend usb if sink */
@@ -6350,7 +6356,6 @@ static void smblib_typec_reenable_work(struct work_struct *work)
 		smblib_err(chg, "Couldn't read typec stat5 rc = %d\n", rc);
 		goto unlock;
 	}
-
 
 	if (stat == TYPEC_VBUS_STATUS_BIT) {
 		smblib_dbg(chg, PR_MISC, "running typec reenable workaround\n");
