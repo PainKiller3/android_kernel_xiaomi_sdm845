@@ -1,5 +1,5 @@
 /* Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
- * Copyright (C) 2018 XiaoMi, Inc.
+ * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -677,6 +677,18 @@ static int fg_get_battery_temp(struct fg_chip *chip, int *val)
 	/* Value is in 0.25Kelvin; Convert it to deciDegC */
 	*val = DIV_ROUND_CLOSEST((temp - 273*4) * 10, 4);
 	return 0;
+}
+
+static int fg_get_battery_esr(struct fg_chip *chip, int *val)
+{
+	int rc, esr_uohms;
+		rc = fg_get_sram_prop(chip, FG_SRAM_ESR, &esr_uohms);
+	if (rc < 0) {
+		pr_err("failed to get ESR, rc=%d\n", rc);
+		return rc;
+	}
+	*val = esr_uohms;
+	return esr_uohms;
 }
 
 static int fg_get_battery_resistance(struct fg_chip *chip, int *val)
@@ -2174,15 +2186,43 @@ static int fg_adjust_recharge_soc(struct fg_chip *chip)
 	 * the recharge SOC threshold based on the monotonic SOC at which
 	 * the charge termination had happened.
 	 */
-	if (is_input_present(chip) && !chip->recharge_soc_adjusted
-			&& chip->charge_done) {
-		if (chip->health == POWER_SUPPLY_HEALTH_GOOD)
-			return 0;
-		/* Get raw monotonic SOC for calculation */
-		rc = fg_get_msoc(chip, &msoc);
-		if (rc < 0) {
-			pr_err("Error in getting msoc, rc=%d\n", rc);
-			return rc;
+	if (is_input_present(chip)) {
+		if (chip->charge_done) {
+			if (!chip->recharge_soc_adjusted) {
+				/* Get raw monotonic SOC for calculation */
+				rc = fg_get_msoc(chip, &msoc);
+				if (rc < 0) {
+					pr_err("Error in getting msoc, rc=%d\n",
+						rc);
+					return rc;
+				}
+
+				/* Adjust the recharge_soc threshold */
+				new_recharge_soc = msoc - (FULL_CAPACITY -
+								recharge_soc);
+				chip->recharge_soc_adjusted = true;
+			} else {
+				/* adjusted already, do nothing */
+				if (chip->health != POWER_SUPPLY_HEALTH_GOOD)
+					return 0;
+
+				/*
+				 * Device is out of JEITA so restore the
+				 * default value
+				 */
+				new_recharge_soc = recharge_soc;
+				chip->recharge_soc_adjusted = false;
+			}
+		} else {
+			if (!chip->recharge_soc_adjusted)
+				return 0;
+
+			if (chip->health != POWER_SUPPLY_HEALTH_GOOD)
+				return 0;
+
+			/* Restore the default value */
+			new_recharge_soc = recharge_soc;
+			chip->recharge_soc_adjusted = false;
 		}
 
 		/* Adjust the recharge_soc threshold */
@@ -4129,6 +4169,9 @@ static int fg_psy_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_RESISTANCE:
 		rc = fg_get_battery_resistance(chip, &pval->intval);
 		break;
+	case POWER_SUPPLY_PROP_ESR:
+		rc = fg_get_battery_esr(chip, &pval->intval);
+		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_OCV:
 		rc = fg_get_sram_prop(chip, FG_SRAM_OCV, &pval->intval);
 		break;
@@ -4391,6 +4434,7 @@ static enum power_supply_property fg_psy_props[] = {
 	POWER_SUPPLY_PROP_CURRENT_NOW,
 	POWER_SUPPLY_PROP_RESISTANCE_ID,
 	POWER_SUPPLY_PROP_RESISTANCE,
+	POWER_SUPPLY_PROP_ESR,
 	POWER_SUPPLY_PROP_BATTERY_TYPE,
 	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
@@ -4744,6 +4788,21 @@ static int fg_hw_init(struct fg_chip *chip)
 			pr_err("Error in writing sync_sleep_threshold=%d\n",
 				rc);
 			return rc;
+		}
+	}
+
+	if (chip->dt.optimize_sram) {
+		int i;
+		for (i = 0; i < chip->dt.optimize_sram_seq_len; i++) {
+			rc = fg_sram_write(chip,
+					chip->dt.optimize_sram_seq[i].addr,
+					chip->dt.optimize_sram_seq[i].offset,
+					(u8 *)&chip->dt.optimize_sram_seq[i].val,
+					1, FG_IMA_DEFAULT);
+			if (rc < 0) {
+				pr_err("Error in optimize_sram_seq, rc=%d\n", rc);
+				return rc;
+			}
 		}
 	}
 
@@ -5267,7 +5326,10 @@ static int fg_parse_ki_coefficients(struct fg_chip *chip)
 			return -EINVAL;
 		}
 	}
-	chip->ki_coeff_dischg_en = true;
+	if (chip->dt.optimize_sram)
+		chip->ki_coeff_dischg_en = false;
+	else
+		chip->ki_coeff_dischg_en = true;
 	return 0;
 }
 
@@ -5311,6 +5373,7 @@ static int fg_parse_dt(struct fg_chip *chip)
 	u32 base, temp;
 	u8 subtype;
 	int rc;
+	int size;
 
 	if (!node)  {
 		dev_err(chip->dev, "device tree node missing\n");
@@ -5711,6 +5774,27 @@ static int fg_parse_dt(struct fg_chip *chip)
 	chip->dt.disable_fg_twm = of_property_read_bool(node,
 					"qcom,fg-disable-in-twm");
 
+	chip->dt.optimize_sram = of_property_read_bool(node, "qcom,optimize-sram");
+	if (chip->dt.optimize_sram) {
+		of_get_property(node, "qcom,optimize-sram-seq", &size);
+		chip->dt.optimize_sram_seq = devm_kzalloc(chip->dev,
+				size, GFP_KERNEL);
+		if (chip->dt.optimize_sram_seq) {
+			chip->dt.optimize_sram_seq_len =
+				(size / sizeof(*chip->dt.optimize_sram_seq));
+			if (chip->dt.optimize_sram_seq_len % 3) {
+				dev_err(chip->dev, "invalid optimize_sram_seq len\n");
+				return -EINVAL;
+			}
+			of_property_read_u32_array(node,
+					"qcom,optimize-sram-seq",
+					(int *)chip->dt.optimize_sram_seq,
+					chip->dt.optimize_sram_seq_len * 3);
+		} else {
+			dev_dbg(chip->dev, "error alloc optimize_sram_seq\n");
+		}
+	}
+
 	return 0;
 }
 
@@ -5894,9 +5978,14 @@ static void fg_battery_soc_smooth_tracking(struct fg_chip *chip)
 	if (chip->param.batt_temp > 150) {
 		/* Battery in normal temperture */
 		if (chip->param.batt_ma < 0)
-			delta_time = time_since_last_change_sec / 30;
-		else
-			delta_time = time_since_last_change_sec / 60;
+			 delta_time = time_since_last_change_sec / 30;
+		else {
+			calculate_average_current(chip);
+			if (chip->param.batt_ma_avg > 1000000)
+				delta_time = time_since_last_change_sec / 20;
+			else
+				delta_time = time_since_last_change_sec / 60;
+		}
 	} else {
 		/* Battery in low temperture */
 		calculate_average_current(chip);

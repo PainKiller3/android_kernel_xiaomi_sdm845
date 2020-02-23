@@ -1,5 +1,5 @@
 /* Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
- * Copyright (C) 2018 XiaoMi, Inc.
+ * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -368,8 +368,8 @@ struct smb_charger {
 	struct delayed_work	monitor_low_temp_work;
 	struct delayed_work	cc_float_charge_work;
 	struct delayed_work	typec_reenable_work;
-	struct delayed_work	charger_type_recheck;
-	struct delayed_work	connector_health_work;
+	struct delayed_work     charger_type_recheck;
+	struct delayed_work     connector_health_work;
 	struct delayed_work	dc_input_current_work;
 	struct delayed_work	check_vbus_work;
 
@@ -400,7 +400,7 @@ struct smb_charger {
 	int			fake_batt_status;
 	bool			step_chg_enabled;
 	bool			sw_jeita_enabled;
-	bool			dynamic_fv_enabled;
+	bool                    dynamic_fv_enabled;
 	bool			wireless_charging_flag;
 	bool			wireless_support;
 	bool			is_hdc;

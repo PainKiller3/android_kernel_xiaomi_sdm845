@@ -1,5 +1,5 @@
 /* Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
- * Copyright (C) 2018 XiaoMi, Inc.
+ * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -585,8 +585,9 @@ static int handle_dynamic_fv(struct step_chg_info *chip)
 	power_supply_get_property(chip->batt_psy,
 		POWER_SUPPLY_PROP_VOLTAGE_NOW, &pval);
 	batt_vol = pval.intval;
-	if (batt_vol >= fv_uv)
+	if (batt_vol >= fv_uv){
 		goto update_time;
+	}
 
 	chip->fv_votable = find_votable("FV");
 	if (!chip->fv_votable)
@@ -598,13 +599,12 @@ static int handle_dynamic_fv(struct step_chg_info *chip)
 	pval.intval = fv_uv - 10000;
 	rc = power_supply_set_property(chip->bms_psy,
 		POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE, &pval);
-	if (rc < 0) {
+	if (rc < 0){
 		pr_err("Couldn't set CONSTANT VOLTAGE property rc=%d\n", rc);
 		return rc;
 	}
 
-	pr_debug("%s:cycle_count:%d,Batt_full:%d,fv:%d,\n",
-			__func__, cycle_count, pval.intval, fv_uv);
+	pr_debug("%s:cycle_count:%d,Batt_full:%d,fv:%d,\n", __func__, cycle_count,pval.intval, fv_uv);
 
 update_time:
 	chip->dynamic_fv_last_update_time = ktime_get();
