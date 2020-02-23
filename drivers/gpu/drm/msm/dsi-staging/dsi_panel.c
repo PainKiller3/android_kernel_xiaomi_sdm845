@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
- * Copyright (C) 2018 XiaoMi, Inc.
+ * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -801,6 +801,7 @@ static void dsi_panel_offon_mode_control(struct dsi_panel *panel, u32 bl_lvl)
 				}
 
 				set_skip_panel_dead(true);
+				pr_debug("%s: set set_skip_panel_dead = true \n", __func__);
 				panel_disp_param_send_lock(panel, DISPLAY_OFF_MODE);
 
 				if (panel->disable_cabc)
@@ -813,6 +814,7 @@ static void dsi_panel_offon_mode_control(struct dsi_panel *panel, u32 bl_lvl)
 			panel->dsi_panel_off_mode = false;
 
 			set_skip_panel_dead(false);
+			pr_debug("%s: set set_skip_panel_dead = false \n", __func__);
 			panel_disp_param_send_lock(panel, DISPLAY_ON_MODE);
 		}
 	}
@@ -2498,6 +2500,9 @@ static int dsi_panel_parse_bl_config(struct dsi_panel *panel,
 		panel->bl_config.type = DSI_BACKLIGHT_UNKNOWN;
 	}
 
+	panel->bl_config.dcs_type_ss = of_property_read_bool(of_node,
+						"qcom,mdss-dsi-bl-dcs-type-ss");
+
 	data = of_get_property(of_node, "qcom,bl-update-flag", NULL);
 	if (!data) {
 		panel->bl_config.bl_update = BL_UPDATE_NONE;
@@ -2521,19 +2526,29 @@ static int dsi_panel_parse_bl_config(struct dsi_panel *panel,
 	panel->bl_config.dcs_type_ss = of_property_read_bool(of_node,
 						"qcom,mdss-dsi-bl-dcs-type-ss");
 
-	data = of_get_property(of_node, "qcom,bl-update-flag", NULL);
-	if (!data) {
-		panel->bl_config.bl_update = BL_UPDATE_NONE;
-	} else if (!strcmp(data, "delay_until_first_frame")) {
-		panel->bl_config.bl_update = BL_UPDATE_DELAY_UNTIL_FIRST_FRAME;
+	rc = of_property_read_u32(of_node, "qcom,bl-update-delay", &val);
+	if (rc) {
+		pr_debug("[%s] bl-update-delay unspecified, defaulting to zero\n",
+			 panel->name);
+		panel->bl_config.bl_update_delay = 0;
 	} else {
-		pr_debug("[%s] No valid bl-update-flag: %s\n",
-						panel->name, data);
-		panel->bl_config.bl_update = BL_UPDATE_NONE;
+		panel->bl_config.bl_update_delay = val;
 	}
 
 	panel->bl_config.bl_scale = MAX_BL_SCALE_LEVEL;
 	panel->bl_config.bl_scale_ad = MAX_AD_BL_SCALE_LEVEL;
+
+	panel->bl_config.dcs_type_ss = of_property_read_bool(of_node,
+						"qcom,mdss-dsi-bl-dcs-type-ss");
+
+	rc = of_property_read_u32(of_node, "qcom,bl-update-delay", &val);
+	if (rc) {
+		pr_debug("[%s] bl-update-delay unspecified, defaulting to zero\n",
+			 panel->name);
+		panel->bl_config.bl_update_delay = 0;
+	} else {
+		panel->bl_config.bl_update_delay = val;
+	}
 
 	rc = of_property_read_u32(of_node, "qcom,mdss-dsi-bl-min-level", &val);
 	if (rc) {
@@ -4988,6 +5003,7 @@ int dsi_panel_disable(struct dsi_panel *panel)
 			goto error;
 		}
 	}
+
 	panel->panel_initialized = false;
 	panel->skip_dimmingon = STATE_NONE;
 	panel->fod_hbm_enabled = false;
