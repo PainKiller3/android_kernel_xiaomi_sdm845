@@ -34,8 +34,12 @@
 #include <linux/sched.h>
 #endif
 #include <trace/events/power.h>
+#include <linux/moduleparam.h>
 
 static LIST_HEAD(cpufreq_policy_list);
+
+static int userspace_boost_enable = 0;
+module_param(userspace_boost_enable, int, 0644);
 
 static inline bool policy_is_inactive(struct cpufreq_policy *policy)
 {
@@ -772,8 +776,9 @@ static ssize_t store_##file_name					\
 	int ret, temp;							\
 	struct cpufreq_policy new_policy;				\
 									\
-	if (&policy->object == &policy->min)				\
-		return count;						\
+	if(!userspace_boost_enable)				\
+		if (&policy->object == &policy->min)				\
+			return count;						\
 									\
 	memcpy(&new_policy, policy, sizeof(*policy));			\
 	new_policy.min = policy->user_policy.min;			\
