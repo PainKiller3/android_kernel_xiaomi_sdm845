@@ -419,6 +419,7 @@
 	qcom,battery-data = <&mtp_batterydata>;
 	qcom,slope-limit-temp-threshold = <100>;
 	qcom,slope-limit-coeffs = <10 11 12 13>;
+	google,fg-soc-irq-disable;
 };
 
 &pmi8998_pwm_1 {
