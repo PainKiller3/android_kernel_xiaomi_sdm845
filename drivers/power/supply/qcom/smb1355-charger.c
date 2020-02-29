@@ -1,5 +1,5 @@
 /* Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
- * Copyright (C) 2018 XiaoMi, Inc.
+ * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -578,25 +578,41 @@ static int smb1355_get_prop_batt_charge_type(struct smb1355 *chip,
 
 static int smb1355_get_prop_online(struct smb1355 *chip, union power_supply_propval *val)
 {
-    int rc;
-    u8 stat;
+	int rc;
+	u8 stat;
 
-    rc = smb1355_read(chip, POWER_PATH_STATUS_REG, &stat);
-    if (rc < 0) {
-        pr_err("Couldn't read power path status rc=%d\n", rc);
-        return rc;
-    }
+	rc = smb1355_read(chip, POWER_PATH_STATUS_REG, &stat);
+	if (rc < 0) {
+		pr_err("Couldn't read power path status rc=%d\n", rc);
+		return rc;
+	}
 
-    val->intval = (stat & USE_USBIN_BIT) &&
-                    (stat & VALID_INPUT_POWER_SOURCE_STS_BIT);
+	val->intval = (stat & USE_USBIN_BIT) &&
+				(stat & VALID_INPUT_POWER_SOURCE_STS_BIT);
 
-    return rc;
+	return rc;
 }
 
 static int smb1355_get_prop_health(struct smb1355 *chip, int type)
 {
 	u8 temp;
 	int rc, shift;
+	u8 stat = 0;
+	int usb_present = 0;
+	static int overheat;
+
+	rc = smb1355_read(chip, POWER_PATH_STATUS_REG, &stat);
+	if (rc < 0) {
+		pr_err("Couldn't read power path status rc=%d\n", rc);
+		return POWER_SUPPLY_HEALTH_COOL;
+	}
+	usb_present = (stat & USE_USBIN_BIT) &&
+		(stat & VALID_INPUT_POWER_SOURCE_STS_BIT);
+
+	if (type == CONNECTOR_TEMP && !usb_present) {
+		overheat = 0;
+		return POWER_SUPPLY_HEALTH_COOL;
+	}
 
 	/* Connector-temp uses skin-temp configuration */
 	shift = (type == CONNECTOR_TEMP) ? SKIN_TEMP_SHIFT : 0;
@@ -610,8 +626,25 @@ static int smb1355_get_prop_health(struct smb1355 *chip, int type)
 		return POWER_SUPPLY_HEALTH_UNKNOWN;
 	}
 
-	if (temp & (TEMP_RST_HOT_BIT << shift))
-		return POWER_SUPPLY_HEALTH_OVERHEAT;
+	if (temp & (TEMP_RST_HOT_BIT << shift)) {
+		if (type == CONNECTOR_TEMP) {
+			if (overheat > 5) {
+				pr_info("%s: ntc is overheat:%x!\n",
+					__func__, temp);
+				return POWER_SUPPLY_HEALTH_OVERHEAT;
+			}
+			if (overheat < 5) {
+				pr_info("%s overheat count:%d\n",
+					__func__, overheat);
+				overheat++;
+				return POWER_SUPPLY_HEALTH_HOT;
+			}
+		} else {
+			return POWER_SUPPLY_HEALTH_OVERHEAT;
+		}
+	}
+	if (type == CONNECTOR_TEMP)
+		overheat = 0;
 
 	if (temp & (TEMP_UB_HOT_BIT << shift))
 		return POWER_SUPPLY_HEALTH_HOT;
@@ -642,8 +675,8 @@ static int smb1355_get_prop_charger_temp_max(struct smb1355 *chip,
 
 #define MIN_PARALLEL_ICL_UA		250000
 static int smb1355_parallel_get_prop(struct power_supply *psy,
-				     enum power_supply_property prop,
-				     union power_supply_propval *val)
+					 enum power_supply_property prop,
+					 union power_supply_propval *val)
 {
 	struct smb1355 *chip = power_supply_get_drvdata(psy);
 	u8 stat;
@@ -760,7 +793,7 @@ static int smb1355_set_parallel_charging(struct smb1355 *chip, bool disable)
 				 disable ? 0 : WDOG_TIMER_EN_BIT);
 	if (rc < 0) {
 		pr_err("Couldn't %s watchdog rc=%d\n",
-		       disable ? "disable" : "enable", rc);
+			   disable ? "disable" : "enable", rc);
 		disable = true;
 	}
 
@@ -832,14 +865,14 @@ static int smb1355_clk_request(struct smb1355 *chip, bool enable)
 				enable ? CLOCK_REQUEST_CMD_BIT : 0);
 	if (rc < 0)
 		pr_err("Couldn't %s clock rc=%d\n",
-			       enable ? "enable" : "disable", rc);
+				   enable ? "enable" : "disable", rc);
 
 	return rc;
 }
 
 static int smb1355_parallel_set_prop(struct power_supply *psy,
-				     enum power_supply_property prop,
-				     const union power_supply_propval *val)
+					 enum power_supply_property prop,
+					 const union power_supply_propval *val)
 {
 	struct smb1355 *chip = power_supply_get_drvdata(psy);
 	int rc = 0;
@@ -878,7 +911,7 @@ static int smb1355_parallel_set_prop(struct power_supply *psy,
 }
 
 static int smb1355_parallel_prop_is_writeable(struct power_supply *psy,
-					      enum power_supply_property prop)
+						  enum power_supply_property prop)
 {
 	switch (prop) {
 	case POWER_SUPPLY_PROP_CONNECTOR_HEALTH:
@@ -1240,7 +1273,7 @@ static int smb1355_init_hw(struct smb1355 *chip)
 				MISC_ENG_SDCDC_INPUT_CURRENT_CFG2_REG,
 				INPUT_CURRENT_LIMIT_SOURCE_BIT
 				| HS_II_CORRECTION_MASK,
-			       INPUT_CURRENT_LIMIT_SOURCE_BIT | 0xC);
+				   INPUT_CURRENT_LIMIT_SOURCE_BIT | 0xC);
 
 		if (rc < 0) {
 			pr_err("Couldn't set MISC_ENG_SDCDC_INPUT_CURRENT_CFG2_REG rc=%d\n",
