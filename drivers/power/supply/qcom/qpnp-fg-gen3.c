@@ -6052,6 +6052,7 @@ static struct thermal_zone_of_device_ops fg_gen3_tz_ops = {
 };
 
 #define FG_DELAY_BATT_ID_MS 1000
+#define FG_DELAY_SOC_WORK_MS 1000
 static int fg_gen3_probe(struct platform_device *pdev)
 {
 	struct fg_chip *chip;
@@ -6275,7 +6276,8 @@ static int fg_gen3_probe(struct platform_device *pdev)
 	device_init_wakeup(chip->dev, true);
 	schedule_delayed_work(&chip->profile_load_work,
 			      msecs_to_jiffies(FG_DELAY_BATT_ID_MS));
-	schedule_delayed_work(&chip->soc_work, 0);
+	schedule_delayed_work(&chip->soc_work,
+			      msecs_to_jiffies(FG_DELAY_SOC_WORK_MS));
 
 	chip->param.batt_soc = -EINVAL;
 	schedule_delayed_work(&chip->soc_monitor_work,
