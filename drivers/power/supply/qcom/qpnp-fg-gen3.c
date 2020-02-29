@@ -2752,8 +2752,7 @@ static void fg_cycle_counter_update(struct fg_chip *chip)
 	/* Find out which bucket the SOC falls in */
 	bucket = batt_soc / BUCKET_SOC_PCT;
 
-	if (chip->batt_psy)
-	{
+	if (chip->batt_psy) {
 		rc = power_supply_get_property(chip->batt_psy, POWER_SUPPLY_PROP_INPUT_SUSPEND,
 				&prop);
 		if (rc < 0) {
@@ -3332,8 +3331,9 @@ static void profile_load_work(struct work_struct *work)
 			chip->batt_id_ohms / 1000, rc);
 		goto out;
 	}
-        /*xiaomi move qcom_step_chg_init to fg driver*/
-        qcom_step_chg_init(chip->dev, 0 , 1);
+
+	/*xiaomi move qcom_step_chg_init to fg driver*/
+	qcom_step_chg_init(chip->dev, 0, 1);
 
 	if (!chip->profile_available)
 		goto out;
@@ -5796,43 +5796,43 @@ static void soc_work_fn(struct work_struct *work)
 
 static void empty_restart_fg_work(struct work_struct *work)
 {
-        struct fg_chip *chip = container_of(work,
-                                struct fg_chip,
-                                empty_restart_fg_work.work);
-        union power_supply_propval prop = {0, };
-        int usb_present = 0;
-        int rc;
+	struct fg_chip *chip = container_of(work,
+				struct fg_chip,
+				empty_restart_fg_work.work);
+	union power_supply_propval prop = {0, };
+	int usb_present = 0;
+	int rc;
 
-        if (usb_psy_initialized(chip)) {
-                rc = power_supply_get_property(chip->usb_psy,
-                        POWER_SUPPLY_PROP_PRESENT, &prop);
-                if (rc < 0) {
-                        pr_err("Couldn't read usb present prop rc=%d\n", rc);
-                        return;
-                }
-                usb_present = prop.intval;
-        }
+	if (usb_psy_initialized(chip)) {
+		rc = power_supply_get_property(chip->usb_psy,
+			POWER_SUPPLY_PROP_PRESENT, &prop);
+		if (rc < 0) {
+			pr_err("Couldn't read usb present prop rc=%d\n", rc);
+			return;
+		}
+		usb_present = prop.intval;
+	}
 
-        /* only when usb is absent, restart fg */
-        if (!usb_present) {
-                if (chip->profile_loaded) {
-                        pr_info("soc empty after cold to warm, need to restart fg\n");
-                        chip->empty_restart_fg = true;
-                        rc = __fg_restart(chip);
-                        if (rc < 0) {
-                                pr_err("Error in restarting FG, rc=%d\n", rc);
-                                chip->empty_restart_fg = false;
-                                return;
-                        }
-                        pr_info("FG restart done\n");
-                        if (batt_psy_initialized(chip))
-                                power_supply_changed(chip->batt_psy);
-                } else {
-                        schedule_delayed_work(
-                                        &chip->empty_restart_fg_work,
-                                        msecs_to_jiffies(RESTART_FG_WORK_MS));
-                }
-        }
+	/* only when usb is absent, restart fg */
+	if (!usb_present) {
+		if (chip->profile_loaded) {
+			pr_info("soc empty after cold to warm, need to restart fg\n");
+			chip->empty_restart_fg = true;
+			rc = __fg_restart(chip);
+			if (rc < 0) {
+				pr_err("Error in restarting FG, rc=%d\n", rc);
+				chip->empty_restart_fg = false;
+				return;
+			}
+			pr_info("FG restart done\n");
+			if (batt_psy_initialized(chip))
+				power_supply_changed(chip->batt_psy);
+		} else {
+			schedule_delayed_work(
+					&chip->empty_restart_fg_work,
+					msecs_to_jiffies(RESTART_FG_WORK_MS));
+		}
+	}
 }
 
 static int calculate_delta_time(struct timespec *time_stamp, int *delta_time_s)
@@ -5900,8 +5900,13 @@ static void fg_battery_soc_smooth_tracking(struct fg_chip *chip)
 		/* Battery in normal temperture */
 		if (chip->param.batt_ma < 0)
 			delta_time = time_since_last_change_sec / 30;
-		else
-			delta_time = time_since_last_change_sec / 60;
+		else {
+			calculate_average_current(chip);
+			if (chip->param.batt_ma_avg > 1000000)
+				delta_time = time_since_last_change_sec / 20;
+			else
+				delta_time = time_since_last_change_sec / 60;
+		}
 	} else {
 		/* Battery in low temperture */
 		calculate_average_current(chip);
@@ -5921,26 +5926,26 @@ static void fg_battery_soc_smooth_tracking(struct fg_chip *chip)
 
 	if (last_batt_soc >= 0) {
 		if (last_batt_soc < chip->param.batt_raw_soc &&
-					chip->param.batt_ma < 0)
-		  /* Battery in charging status
-		   * update the soc when resuming device
-		   */
-		  last_batt_soc = chip->param.update_now ?
-			  chip->param.batt_raw_soc : last_batt_soc + soc_changed;
+			chip->param.batt_ma < 0)
+			/* Battery in charging status
+			 * update the soc when resuming device
+			 */
+			last_batt_soc = chip->param.update_now ?
+				chip->param.batt_raw_soc :
+				last_batt_soc + soc_changed;
 		else if (last_batt_soc > chip->param.batt_raw_soc
 					&& chip->param.batt_ma > 0)
-		  /* Battery in discharging status
-		   * update the soc when resuming device
-		   */
-		  last_batt_soc = chip->param.update_now ?
-			  chip->param.batt_raw_soc : last_batt_soc - soc_changed;
+			/* Battery in discharging status
+			 * update the soc when resuming device
+			 */
+			last_batt_soc = chip->param.update_now ?
+				chip->param.batt_raw_soc :
+				last_batt_soc - soc_changed;
 		else if (last_batt_soc != 100
-					&& chip->param.batt_raw_soc >= 95
-					&& chip->charge_status == POWER_SUPPLY_STATUS_FULL)
-
+				&& chip->param.batt_raw_soc >= 95
+				&& chip->charge_status == POWER_SUPPLY_STATUS_FULL)
 			last_batt_soc = chip->param.update_now ?
 				100 : last_batt_soc + soc_changed;
-
 		chip->param.update_now = false;
 	} else {
 		last_batt_soc = chip->param.batt_raw_soc;
@@ -5978,7 +5983,8 @@ static void soc_monitor_work(struct work_struct *work)
 	if (rc < 0)
 		pr_err("failed to get battery temperature, rc=%d\n", rc);
 
-	fg_battery_soc_smooth_tracking(chip);
+	if (chip->soc_reporting_ready)
+		fg_battery_soc_smooth_tracking(chip);
 
 	pr_info("soc:%d, raw_soc:%d, c:%d, s:%d\n",
 				chip->param.batt_soc, chip->param.batt_raw_soc,
@@ -6276,15 +6282,15 @@ static int fg_gen3_probe(struct platform_device *pdev)
 	schedule_delayed_work(&chip->soc_monitor_work,
 				msecs_to_jiffies(MONITOR_SOC_WAIT_MS));
 	/*
-         * if vbat is above 3.7V and msoc is 0% and battery temperature is
-         * above 15 degree, we restart fg to do new first soc calculate to
-         * improve user experience when device is shutdown in cold then
-         * try to power on in normal temperature room.
-         */
-        if ((volt_uv >= VBAT_RESTART_FG_EMPTY_UV)
-                        && (msoc == 0) && (batt_temp >= TEMP_THR_RESTART_FG))
-                schedule_delayed_work(&chip->empty_restart_fg_work,
-                                        msecs_to_jiffies(RESTART_FG_START_WORK_MS));
+	 * if vbat is above 3.7V and msoc is 0% and battery temperature is
+	 * above 15 degree, we restart fg to do new first soc calculate to
+	 * improve user experience when device is shutdown in cold then
+	 * try to power on in normal temperature room.
+	 */
+	if ((volt_uv >= VBAT_RESTART_FG_EMPTY_UV)
+			   && (msoc == 0) && (batt_temp >= TEMP_THR_RESTART_FG))
+		schedule_delayed_work(&chip->empty_restart_fg_work,
+				 msecs_to_jiffies(RESTART_FG_START_WORK_MS));
 
 	pr_debug("FG GEN3 driver probed successfully\n");
 	return 0;
@@ -6364,7 +6370,6 @@ static void fg_gen3_shutdown(struct platform_device *pdev)
 		pr_err("Error in getting capacity, rc=%d\n", rc);
 		return;
 	}
-
 	if (chip->charge_full || (msoc == 100)) {
 		rc = fg_get_sram_prop(chip, FG_SRAM_BATT_SOC, &bsoc);
 		if (rc < 0) {

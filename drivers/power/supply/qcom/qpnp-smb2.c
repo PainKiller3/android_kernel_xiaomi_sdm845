@@ -213,8 +213,8 @@ module_param_named(
 #define MICRO_1P5A		1500000
 #define MICRO_P1A		100000
 #define OTG_DEFAULT_DEGLITCH_TIME_MS	50
-#define MAX_DCP_ICL_UA  1800000
-#define DEFAULT_CRITICAL_JEITA_CCOMP 2975000
+#define MAX_DCP_ICL_UA		1800000
+#define DEFAULT_CRITICAL_JEITA_CCOMP	2975000
 #define JEITA_SOFT_HOT_CC_COMP		1600000
 #define JEITA_SOFT_COOL_CC_COMP		2225000
 #define MIN_WD_BARK_TIME		16
@@ -464,7 +464,7 @@ static int smb2_parse_dt(struct smb2 *chip)
 		chg->otg_delay_ms = OTG_DEFAULT_DEGLITCH_TIME_MS;
 
 	rc = of_property_read_u32(node, "qcom,fcc-low-temp-delta",
-				&chip->dt.jeita_low_cc_delta);
+					&chip->dt.jeita_low_cc_delta);
 	if (rc < 0)
 		chip->dt.jeita_low_cc_delta = DEFAULT_CRITICAL_JEITA_CCOMP;
 	chg->jeita_ccomp_low_delta = chip->dt.jeita_low_cc_delta;
@@ -546,7 +546,7 @@ static int smb2_usb_get_prop(struct power_supply *psy,
 			rc = smblib_get_prop_usb_present(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_ONLINE:
-		if (chg->report_usb_absent){
+		if (chg->report_usb_absent) {
 			val->intval = 0;
 			break;
 		}
@@ -823,7 +823,7 @@ static int smb2_usb_port_get_prop(struct power_supply *psy,
 		val->intval = POWER_SUPPLY_TYPE_USB;
 		break;
 	case POWER_SUPPLY_PROP_ONLINE:
-		if (chg->report_usb_absent){
+		if (chg->report_usb_absent) {
 			val->intval = 0;
 			break;
 		}
@@ -1202,6 +1202,17 @@ static int smb2_get_prop_wireless_signal(struct smb_charger *chg,
 	return rc;
 }
 
+static int smb2_get_prop_wireless_type(struct smb_charger *chg,
+				union power_supply_propval *val)
+{
+	chg->idtp_psy = power_supply_get_by_name("idt");
+	if (chg->idtp_psy)
+		power_supply_get_property(chg->idtp_psy,
+			POWER_SUPPLY_PROP_TX_ADAPTER, val);
+
+	return 1;
+}
+
 /*****************************
  * WIRELESS PSY REGISTRATION *
  *****************************/
@@ -1210,6 +1221,7 @@ static enum power_supply_property smb2_wireless_props[] = {
 	POWER_SUPPLY_PROP_WIRELESS_VERSION,
 	POWER_SUPPLY_PROP_SIGNAL_STRENGTH,
 	POWER_SUPPLY_PROP_WIRELESS_WAKELOCK,
+	POWER_SUPPLY_PROP_TX_ADAPTER,
 };
 
 static int smb2_wireless_set_prop(struct power_supply *psy,
@@ -1251,6 +1263,9 @@ static int smb2_wireless_get_prop(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_WIRELESS_WAKELOCK:
 		val->intval = 1;
+		break;
+	case POWER_SUPPLY_PROP_TX_ADAPTER:
+		smb2_get_prop_wireless_type(chg, val);
 		break;
 	default:
 		return -EINVAL;

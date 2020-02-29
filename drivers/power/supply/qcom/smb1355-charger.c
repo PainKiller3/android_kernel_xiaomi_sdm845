@@ -629,10 +629,13 @@ static int smb1355_get_prop_health(struct smb1355 *chip, int type)
 	if (temp & (TEMP_RST_HOT_BIT << shift)) {
 		if (type == CONNECTOR_TEMP) {
 			if (overheat > 5) {
-				pr_info("%s: ntc is overheat:%x!\n", __func__, temp);
+				pr_info("%s: ntc is overheat:%x!\n",
+					__func__, temp);
 				return POWER_SUPPLY_HEALTH_OVERHEAT;
-			} else {
-				pr_info("%s overheat count:%d\n", __func__, overheat);
+			}
+			if (overheat < 5) {
+				pr_info("%s overheat count:%d\n",
+					__func__, overheat);
 				overheat++;
 				return POWER_SUPPLY_HEALTH_HOT;
 			}
@@ -672,8 +675,8 @@ static int smb1355_get_prop_charger_temp_max(struct smb1355 *chip,
 
 #define MIN_PARALLEL_ICL_UA		250000
 static int smb1355_parallel_get_prop(struct power_supply *psy,
-				     enum power_supply_property prop,
-				     union power_supply_propval *val)
+					 enum power_supply_property prop,
+					 union power_supply_propval *val)
 {
 	struct smb1355 *chip = power_supply_get_drvdata(psy);
 	u8 stat;
@@ -790,7 +793,7 @@ static int smb1355_set_parallel_charging(struct smb1355 *chip, bool disable)
 				 disable ? 0 : WDOG_TIMER_EN_BIT);
 	if (rc < 0) {
 		pr_err("Couldn't %s watchdog rc=%d\n",
-		       disable ? "disable" : "enable", rc);
+			   disable ? "disable" : "enable", rc);
 		disable = true;
 	}
 
@@ -862,14 +865,14 @@ static int smb1355_clk_request(struct smb1355 *chip, bool enable)
 				enable ? CLOCK_REQUEST_CMD_BIT : 0);
 	if (rc < 0)
 		pr_err("Couldn't %s clock rc=%d\n",
-			       enable ? "enable" : "disable", rc);
+				   enable ? "enable" : "disable", rc);
 
 	return rc;
 }
 
 static int smb1355_parallel_set_prop(struct power_supply *psy,
-				     enum power_supply_property prop,
-				     const union power_supply_propval *val)
+					 enum power_supply_property prop,
+					 const union power_supply_propval *val)
 {
 	struct smb1355 *chip = power_supply_get_drvdata(psy);
 	int rc = 0;
@@ -908,7 +911,7 @@ static int smb1355_parallel_set_prop(struct power_supply *psy,
 }
 
 static int smb1355_parallel_prop_is_writeable(struct power_supply *psy,
-					      enum power_supply_property prop)
+						  enum power_supply_property prop)
 {
 	switch (prop) {
 	case POWER_SUPPLY_PROP_CONNECTOR_HEALTH:
@@ -1050,7 +1053,8 @@ static int smb1355_tskin_sensor_config(struct smb1355 *chip)
 		}
 
 		rc = smb1355_masked_write(chip, BATIF_C1_REG_CFG,
-					0xff, 0);
+					0xff,
+					0);
 		if (rc < 0) {
 			pr_err("Couldn't set  BATIF_CFG_SMISC_BATID rc=%d\n",
 				rc);
@@ -1269,7 +1273,7 @@ static int smb1355_init_hw(struct smb1355 *chip)
 				MISC_ENG_SDCDC_INPUT_CURRENT_CFG2_REG,
 				INPUT_CURRENT_LIMIT_SOURCE_BIT
 				| HS_II_CORRECTION_MASK,
-			       INPUT_CURRENT_LIMIT_SOURCE_BIT | 0xC);
+				   INPUT_CURRENT_LIMIT_SOURCE_BIT | 0xC);
 
 		if (rc < 0) {
 			pr_err("Couldn't set MISC_ENG_SDCDC_INPUT_CURRENT_CFG2_REG rc=%d\n",
