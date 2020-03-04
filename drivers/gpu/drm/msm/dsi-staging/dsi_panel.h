@@ -366,6 +366,11 @@ struct dsi_panel *dsi_panel_ext_bridge_get(struct device *parent,
 int dsi_panel_parse_esd_reg_read_configs(struct dsi_panel *panel,
 				struct device_node *of_node);
 
+int dsi_display_read_panel(struct dsi_panel *panel,
+				struct dsi_read_config *read_config);
+
+int panel_disp_param_send_lock(struct dsi_panel *panel, int param);
+
 void dsi_panel_ext_bridge_put(struct dsi_panel *panel);
 
 #endif /* _DSI_PANEL_H_ */
