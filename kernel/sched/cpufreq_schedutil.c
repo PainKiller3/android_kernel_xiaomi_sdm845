@@ -903,6 +903,7 @@ static int sugov_init(struct cpufreq_policy *policy)
 	tunables->down_rate_limit_us = 0;
 	tunables->hispeed_load = DEFAULT_HISPEED_LOAD;
 	tunables->hispeed_freq = 0;
+	tunables->exp_util = true;
 
 	policy->governor_data = sg_policy;
 	sg_policy->tunables = tunables;
