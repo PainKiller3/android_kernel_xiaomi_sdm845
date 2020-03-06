@@ -19,7 +19,6 @@
 ** =============================================================================
 */
 
-#define DEBUG
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -1216,7 +1215,7 @@ static u8 ti_crc8(const u8 table[CRC8_TABLE_SIZE], u8 *pdata, size_t nbytes, u8 
 	return crc;
 }
 
-static int doSingleRegCheckSum(struct tas2557_priv *pTAS2557, 
+static int doSingleRegCheckSum(struct tas2557_priv *pTAS2557,
 	unsigned char nBook, unsigned char nPage, unsigned char nReg, unsigned char nValue)
 {
 	int nResult = 0;
@@ -1253,7 +1252,7 @@ end:
 	return nResult;
 }
 
-static int doMultiRegCheckSum(struct tas2557_priv *pTAS2557, 
+static int doMultiRegCheckSum(struct tas2557_priv *pTAS2557,
 	unsigned char nBook, unsigned char nPage, unsigned char nReg, unsigned int len)
 {
 	int nResult = 0, i;
