@@ -25,15 +25,12 @@
 #include <linux/of_gpio.h>
 #include <linux/of_irq.h>
 #include <linux/regulator/consumer.h>
+#include <linux/hwinfo.h>
 
-#if defined(CONFIG_FB)
-#ifdef CONFIG_DRM_MSM
-#include <linux/msm_drm_notify.h>
-#endif
-#include <linux/notifier.h>
+#ifdef CONFIG_DRM
+#include <drm/drm_notifier.h>
+#include <drm/drm_panel.h>
 #include <linux/fb.h>
-#elif defined(CONFIG_HAS_EARLYSUSPEND)
-#include <linux/earlysuspend.h>
 #endif
 
 #include "nt36xxx.h"
@@ -66,15 +63,8 @@ static struct workqueue_struct *nvt_fwu_wq;
 extern void Boot_Update_Firmware(struct work_struct *work);
 #endif
 
-#if defined(CONFIG_FB)
-#ifdef _MSM_DRM_NOTIFY_H_
+#if defined(CONFIG_DRM)
 static int nvt_drm_notifier_callback(struct notifier_block *self, unsigned long event, void *data);
-#else
-static int nvt_fb_notifier_callback(struct notifier_block *self, unsigned long event, void *data);
-#endif
-#elif defined(CONFIG_HAS_EARLYSUSPEND)
-static void nvt_ts_early_suspend(struct early_suspend *h);
-static void nvt_ts_late_resume(struct early_suspend *h);
 #endif
 
 #if TOUCH_KEY_NUM > 0
@@ -786,10 +776,8 @@ static int nvt_parse_dt(struct device *dev)
 	NVT_LOG("novatek,irq-gpio=%d\n", ts->irq_gpio);
 
 	retval = of_property_read_string(np, "novatek,vddio-reg-name", &name);
-	if (retval == -EINVAL)
+	if (retval < 0)
 		ts->vddio_reg_name = NULL;
-	else if (retval < 0)
-		return -EINVAL;
 	else {
 		ts->vddio_reg_name = name;
 		NVT_LOG("vddio_reg_name = %s\n", name);
@@ -883,6 +871,14 @@ static int nvt_parse_dt(struct device *dev)
 static const char *nvt_get_config(struct nvt_ts_data *ts)
 {
 	int i;
+
+	for (i = 0; i < ts->config_array_size; i++) {
+		if ((ts->lockdown_info[0] ==
+		     ts->config_array[i].tp_vendor) &&
+		     (ts->lockdown_info[3] ==
+		     ts->config_array[i].tp_hw_version))
+			break;
+	}
 
 	if (i >= ts->config_array_size) {
 		NVT_LOG("can't find right config\n");
@@ -1111,6 +1107,87 @@ static void nvt_esd_check_func(struct work_struct *work)
 			msecs_to_jiffies(NVT_TOUCH_ESD_CHECK_PERIOD));
 }
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
+
+#if WAKEUP_GESTURE
+#define EVENT_START				0
+#define EVENT_SENSITIVE_MODE_OFF		0
+#define EVENT_SENSITIVE_MODE_ON			1
+#define EVENT_STYLUS_MODE_OFF			2
+#define EVENT_STYLUS_MODE_ON			3
+#define EVENT_WAKEUP_MODE_OFF			4
+#define EVENT_WAKEUP_MODE_ON			5
+#define EVENT_COVER_MODE_OFF			6
+#define EVENT_COVER_MODE_ON			7
+#define EVENT_SLIDE_FOR_VOLUME			8
+#define EVENT_DOUBLE_TAP_FOR_VOLUME		9
+#define EVENT_SINGLE_TAP_FOR_VOLUME		10
+#define EVENT_LONG_SINGLE_TAP_FOR_VOLUME	11
+#define EVENT_PALM_OFF				12
+#define EVENT_PALM_ON				13
+#define EVENT_END				13
+/*******************************************************
+Description:
+	Xiaomi modeswitch work function.
+
+return:
+	n.a.
+*******************************************************/
+static void mi_switch_mode_work(struct work_struct *work)
+{
+	struct mi_mode_switch *ms = container_of(
+			work, struct mi_mode_switch, switch_mode_work
+	);
+	struct nvt_ts_data *data = ms->nvt_data;
+	unsigned char value = ms->mode;
+
+	if (value >= EVENT_WAKEUP_MODE_OFF &&
+		value <= EVENT_WAKEUP_MODE_ON)
+		data->gesture_enabled = value - EVENT_WAKEUP_MODE_OFF;
+	else
+		NVT_ERR("Does not support touch mode %d\n", value);
+
+	if (ms != NULL) {
+		kfree(ms);
+		ms = NULL;
+	}
+}
+
+/*******************************************************
+Description:
+	Xiaomi input events function.
+
+return:
+	n.a.
+*******************************************************/
+static int mi_input_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
+{
+	struct nvt_ts_data *data = input_get_drvdata(dev);
+	struct mi_mode_switch *ms;
+
+	if (type == EV_SYN && code == SYN_CONFIG) {
+		NVT_LOG("set input event value = %d\n", value);
+
+		if (value >= EVENT_START && value <= EVENT_END) {
+			ms = kmalloc(sizeof(struct mi_mode_switch), GFP_ATOMIC);
+
+			if (ms != NULL) {
+				ms->nvt_data = data;
+				ms->mode = (unsigned char)value;
+				INIT_WORK(&ms->switch_mode_work, mi_switch_mode_work);
+				schedule_work(&ms->switch_mode_work);
+			} else {
+				NVT_ERR("Modeswitch memory allocation failed\n");
+				return -ENOMEM;
+			}
+		} else {
+			NVT_ERR("Invalid event value\n");
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+#endif
 
 #define POINT_DATA_LEN 65
 /*******************************************************
@@ -1416,6 +1493,13 @@ out:
 	return ret;
 }
 
+/*******************************************************
+Description:
+	Xiaomi pinctrl init function.
+
+return:
+	Executive outcomes. 0---succeed. negative---failed
+*******************************************************/
 static int nvt_pinctrl_init(struct nvt_ts_data *nvt_data)
 {
 	int retval = 0;
@@ -1587,6 +1671,10 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 	ts->input_dev->name = NVT_TS_NAME;
 	ts->input_dev->phys = ts->phys;
 	ts->input_dev->id.bustype = BUS_I2C;
+#if WAKEUP_GESTURE
+	ts->input_dev->event = mi_input_event;
+	input_set_drvdata(ts->input_dev, ts);
+#endif
 
 	//---register input device---
 	ret = input_register_device(ts->input_dev);
@@ -1613,12 +1701,25 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 			NVT_LOG("request irq %d succeed\n", client->irq);
 		}
 	}
+	update_hardware_info(TYPE_TOUCH, 5);
+
+	ret = nvt_get_lockdown_info(ts->lockdown_info);
+
+	if (ret < 0)
+		NVT_ERR("can't get lockdown info");
+	else {
+		NVT_ERR(
+			"Lockdown:0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x\n",
+			ts->lockdown_info[0], ts->lockdown_info[1], ts->lockdown_info[2],
+			ts->lockdown_info[3], ts->lockdown_info[4], ts->lockdown_info[5],
+			ts->lockdown_info[6], ts->lockdown_info[7]);
+		update_hardware_info(TYPE_TP_MAKER, ts->lockdown_info[0] - 0x30);
+	}
+	ts->fw_name = nvt_get_config(ts);
 
 #if WAKEUP_GESTURE
 	device_init_wakeup(&ts->input_dev->dev, 1);
 #endif
-
-	ts->fw_name = nvt_get_config(ts);
 
 #if BOOT_UPDATE_FIRMWARE
 	nvt_fwu_wq = alloc_workqueue("nvt_fwu_wq", WQ_UNBOUND | WQ_MEM_RECLAIM, 1);
@@ -1670,30 +1771,12 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 	}
 #endif
 
-#if defined(CONFIG_FB)
-#ifdef _MSM_DRM_NOTIFY_H_
-	ts->drm_notif.notifier_call = nvt_drm_notifier_callback;
-	ret = msm_drm_register_client(&ts->drm_notif);
-	if(ret) {
+#if defined(CONFIG_DRM)
+	ts->notifier.notifier_call = nvt_drm_notifier_callback;
+	ret = drm_register_client(&ts->notifier);
+	if (ret) {
 		NVT_ERR("register drm_notifier failed. ret=%d\n", ret);
 		goto err_register_drm_notif_failed;
-	}
-#else
-	ts->fb_notif.notifier_call = nvt_fb_notifier_callback;
-	ret = fb_register_client(&ts->fb_notif);
-	if(ret) {
-		NVT_ERR("register fb_notifier failed. ret=%d\n", ret);
-		goto err_register_fb_notif_failed;
-	}
-#endif
-#elif defined(CONFIG_HAS_EARLYSUSPEND)
-	ts->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
-	ts->early_suspend.suspend = nvt_ts_early_suspend;
-	ts->early_suspend.resume = nvt_ts_late_resume;
-	ret = register_early_suspend(&ts->early_suspend);
-	if(ret) {
-		NVT_ERR("register early suspend failed. ret=%d\n", ret);
-		goto err_register_early_suspend_failed;
 	}
 #endif
 
@@ -1704,19 +1787,10 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 
 	return 0;
 
-#if defined(CONFIG_FB)
-#ifdef _MSM_DRM_NOTIFY_H_
-	if (msm_drm_unregister_client(&ts->drm_notif))
-		NVT_ERR("Error occurred while unregistering drm_notifier.\n");
+#if defined(CONFIG_DRM)
 err_register_drm_notif_failed:
-#else
-	if (fb_unregister_client(&ts->fb_notif))
-		NVT_ERR("Error occurred while unregistering fb_notifier.\n");
-err_register_fb_notif_failed:
-#endif
-#elif defined(CONFIG_HAS_EARLYSUSPEND)
-	unregister_early_suspend(&ts->early_suspend);
-err_register_early_suspend_failed:
+	if (drm_unregister_client(&ts->notifier))
+		NVT_ERR("Error occurred while unregistering drm_notifier.\n");
 #endif
 #if NVT_TOUCH_MP
 nvt_mp_proc_deinit();
@@ -1784,16 +1858,9 @@ static int32_t nvt_ts_remove(struct i2c_client *client)
 {
 	NVT_LOG("Removing driver...\n");
 
-#if defined(CONFIG_FB)
-#ifdef _MSM_DRM_NOTIFY_H_
-	if (msm_drm_unregister_client(&ts->drm_notif))
+#if defined(CONFIG_DRM)
+	if (drm_unregister_client(&ts->notifier))
 		NVT_ERR("Error occurred while unregistering drm_notifier.\n");
-#else
-	if (fb_unregister_client(&ts->fb_notif))
-		NVT_ERR("Error occurred while unregistering fb_notifier.\n");
-#endif
-#elif defined(CONFIG_HAS_EARLYSUSPEND)
-	unregister_early_suspend(&ts->early_suspend);
 #endif
 
 #if NVT_TOUCH_MP
@@ -1827,6 +1894,7 @@ static int32_t nvt_ts_remove(struct i2c_client *client)
 	device_init_wakeup(&ts->input_dev->dev, 0);
 #endif
 
+	nvt_get_reg(ts, false);
 	nvt_irq_enable(false);
 	free_irq(client->irq, ts);
 
@@ -1856,16 +1924,9 @@ static void nvt_ts_shutdown(struct i2c_client *client)
 
 	nvt_irq_enable(false);
 
-#if defined(CONFIG_FB)
-#ifdef _MSM_DRM_NOTIFY_H_
-	if (msm_drm_unregister_client(&ts->drm_notif))
+#if defined(CONFIG_DRM)
+	if (drm_unregister_client(&ts->notifier))
 		NVT_ERR("Error occurred while unregistering drm_notifier.\n");
-#else
-	if (fb_unregister_client(&ts->fb_notif))
-		NVT_ERR("Error occurred while unregistering fb_notifier.\n");
-#endif
-#elif defined(CONFIG_HAS_EARLYSUSPEND)
-	unregister_early_suspend(&ts->early_suspend);
 #endif
 
 #if NVT_TOUCH_MP
@@ -1910,6 +1971,7 @@ return:
 static int32_t nvt_ts_suspend(struct device *dev)
 {
 	uint8_t buf[4] = {0};
+	int ret = 0;
 #if MT_PROTOCOL_B
 	uint32_t i = 0;
 #endif
@@ -1997,6 +2059,8 @@ return:
 *******************************************************/
 static int32_t nvt_ts_resume(struct device *dev)
 {
+	int ret = 0;
+
 	if (bTouchIsAwake) {
 		NVT_LOG("Touch is already resume\n");
 		return 0;
@@ -2050,86 +2114,42 @@ static int32_t nvt_ts_resume(struct device *dev)
 	return 0;
 }
 
-
-#if defined(CONFIG_FB)
-#ifdef _MSM_DRM_NOTIFY_H_
+#if defined(CONFIG_DRM)
 static int nvt_drm_notifier_callback(struct notifier_block *self, unsigned long event, void *data)
 {
-	struct msm_drm_notifier *evdata = data;
+	struct fb_event *evdata = data;
 	int *blank;
 	struct nvt_ts_data *ts =
-		container_of(self, struct nvt_ts_data, drm_notif);
-
-	if (!evdata || (evdata->id != 0))
-		return 0;
+		container_of(self, struct nvt_ts_data, notifier);
 
 	if (evdata->data && ts) {
 		blank = evdata->data;
-		if (event == MSM_DRM_EARLY_EVENT_BLANK) {
-			if (*blank == MSM_DRM_BLANK_POWERDOWN) {
+		if (event == DRM_EARLY_EVENT_BLANK) {
+			if (*blank == DRM_BLANK_POWERDOWN) {
 				NVT_LOG("event=%lu, *blank=%d\n", event, *blank);
-				nvt_enable_reg(ts, true);
+#if WAKEUP_GESTURE
+				if (ts->gesture_enabled) {
+					nvt_enable_reg(ts, true);
+					drm_panel_reset_skip_enable(true);
+				}
+#endif
 				nvt_ts_suspend(&ts->client->dev);
 			}
-		} else if (event == MSM_DRM_EVENT_BLANK) {
-			if (*blank == MSM_DRM_BLANK_UNBLANK) {
+		} else if (event == DRM_EVENT_BLANK) {
+			if (*blank == DRM_BLANK_UNBLANK) {
 				NVT_LOG("event=%lu, *blank=%d\n", event, *blank);
-				nvt_enable_reg(ts, false);
+#if WAKEUP_GESTURE
+				if (ts->gesture_enabled) {
+					drm_panel_reset_skip_enable(false);
+					nvt_enable_reg(ts, false);
+				}
+#endif
 				nvt_ts_resume(&ts->client->dev);
 			}
 		}
 	}
 
 	return 0;
-}
-#else
-static int nvt_fb_notifier_callback(struct notifier_block *self, unsigned long event, void *data)
-{
-	struct fb_event *evdata = data;
-	int *blank;
-	struct nvt_ts_data *ts =
-		container_of(self, struct nvt_ts_data, fb_notif);
-
-	if (evdata && evdata->data && event == FB_EARLY_EVENT_BLANK) {
-		blank = evdata->data;
-		if (*blank == FB_BLANK_POWERDOWN) {
-			NVT_LOG("event=%lu, *blank=%d\n", event, *blank);
-			nvt_ts_suspend(&ts->client->dev);
-		}
-	} else if (evdata && evdata->data && event == FB_EVENT_BLANK) {
-		blank = evdata->data;
-		if (*blank == FB_BLANK_UNBLANK) {
-			NVT_LOG("event=%lu, *blank=%d\n", event, *blank);
-			nvt_ts_resume(&ts->client->dev);
-		}
-	}
-
-	return 0;
-}
-#endif
-#elif defined(CONFIG_HAS_EARLYSUSPEND)
-/*******************************************************
-Description:
-	Novatek touchscreen driver early suspend function.
-
-return:
-	n.a.
-*******************************************************/
-static void nvt_ts_early_suspend(struct early_suspend *h)
-{
-	nvt_ts_suspend(ts->client, PMSG_SUSPEND);
-}
-
-/*******************************************************
-Description:
-	Novatek touchscreen driver late resume function.
-
-return:
-	n.a.
-*******************************************************/
-static void nvt_ts_late_resume(struct early_suspend *h)
-{
-	nvt_ts_resume(ts->client);
 }
 #endif
 

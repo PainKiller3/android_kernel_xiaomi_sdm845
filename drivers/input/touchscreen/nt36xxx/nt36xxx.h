@@ -29,16 +29,16 @@
 
 #include "nt36xxx_mem_map.h"
 
-#define PINCTRL_STATE_ACTIVE		"pmx_ts_active"
-#define PINCTRL_STATE_SUSPEND		"pmx_ts_suspend"
-#define PINCTRL_STATE_RELEASE		"pmx_ts_release"
-
 #define NVT_DEBUG 1
 
 //---GPIO number---
 #define NVTTOUCH_RST_PIN 980
 #define NVTTOUCH_INT_PIN 943
 
+//---Pinctrl state---
+#define PINCTRL_STATE_ACTIVE		"pmx_ts_active"
+#define PINCTRL_STATE_SUSPEND		"pmx_ts_suspend"
+#define PINCTRL_STATE_RELEASE		"pmx_ts_release"
 
 //---INT trigger mode---
 //#define IRQ_TYPE_EDGE_RISING 1
@@ -74,7 +74,7 @@ extern const uint16_t touch_key_array[TOUCH_KEY_NUM];
 #define TOUCH_FORCE_NUM 1000
 
 /* Enable only when module have tp reset pin and connected to host */
-#define NVT_TOUCH_SUPPORT_HW_RST 1
+#define NVT_TOUCH_SUPPORT_HW_RST 0
 
 //---Customerized func.---
 #define NVT_TOUCH_PROC 1
@@ -92,6 +92,9 @@ extern const uint16_t gesture_key_array[];
 #define NVT_TOUCH_ESD_PROTECT 0
 #define NVT_TOUCH_ESD_CHECK_PERIOD 1500	/* ms */
 
+//---Lockdown---
+#define NVT_LOCKDOWN_SIZE	8
+
 struct nvt_config_info {
 	u8 tp_vendor;
 	u8 tp_color;
@@ -105,26 +108,26 @@ struct nvt_ts_data {
 	struct input_dev *input_dev;
 	struct delayed_work nvt_fwu_work;
 
-	struct regulator *vddio_reg;
-	struct regulator *lab_reg;
-	struct regulator *ibb_reg;
 	struct nvt_config_info *config_array;
 	struct pinctrl *ts_pinctrl;
 	struct pinctrl_state *pinctrl_state_active;
 	struct pinctrl_state *pinctrl_state_suspend;
+
+	struct regulator *vddio_reg;
+	struct regulator *lab_reg;
+	struct regulator *ibb_reg;
+
 	const char *vddio_reg_name;
 	const char *lab_reg_name;
 	const char *ibb_reg_name;
 	const char *fw_name;
 
+	u8 lockdown_info[NVT_LOCKDOWN_SIZE];
+
 	uint16_t addr;
 	int8_t phys[32];
-#if defined(CONFIG_FB)
-#ifdef _MSM_DRM_NOTIFY_H_
-	struct notifier_block drm_notif;
-#else
-	struct notifier_block fb_notif;
-#endif
+#if defined(CONFIG_DRM)
+	struct notifier_block notifier;
 #elif defined(CONFIG_HAS_EARLYSUSPEND)
 	struct early_suspend early_suspend;
 #endif
@@ -149,8 +152,19 @@ struct nvt_ts_data {
 	bool irq_enabled;
 
 	size_t config_array_size;
+#if WAKEUP_GESTURE
+	int gesture_enabled;
+#endif
 	int current_index;
 };
+
+#if WAKEUP_GESTURE
+struct mi_mode_switch {
+	struct nvt_ts_data *nvt_data;
+	unsigned char mode;
+	struct work_struct switch_mode_work;
+};
+#endif
 
 #if NVT_TOUCH_PROC
 struct nvt_flash_data{
@@ -192,5 +206,9 @@ extern int32_t nvt_set_page(uint16_t i2c_addr, uint32_t addr);
 extern void nvt_esd_check_enable(uint8_t enable);
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
 extern void nvt_stop_crc_reboot(void);
+
+extern int32_t Init_BootLoader(void);
+extern int32_t Resume_PD(void);
+extern int32_t nvt_get_lockdown_info(char *lockdata);
 
 #endif /* _LINUX_NVT_TOUCH_H */
