@@ -29,6 +29,10 @@
 
 #include "nt36xxx_mem_map.h"
 
+#define PINCTRL_STATE_ACTIVE		"pmx_ts_active"
+#define PINCTRL_STATE_SUSPEND		"pmx_ts_suspend"
+#define PINCTRL_STATE_RELEASE		"pmx_ts_release"
+
 #define NVT_DEBUG 1
 
 //---GPIO number---
@@ -61,7 +65,7 @@
 
 //---Touch info.---
 #define TOUCH_DEFAULT_MAX_WIDTH 1080
-#define TOUCH_DEFAULT_MAX_HEIGHT 1920
+#define TOUCH_DEFAULT_MAX_HEIGHT 2246
 #define TOUCH_MAX_FINGER_NUM 10
 #define TOUCH_KEY_NUM 0
 #if TOUCH_KEY_NUM > 0
@@ -70,7 +74,7 @@ extern const uint16_t touch_key_array[TOUCH_KEY_NUM];
 #define TOUCH_FORCE_NUM 1000
 
 /* Enable only when module have tp reset pin and connected to host */
-#define NVT_TOUCH_SUPPORT_HW_RST 0
+#define NVT_TOUCH_SUPPORT_HW_RST 1
 
 //---Customerized func.---
 #define NVT_TOUCH_PROC 1
@@ -81,17 +85,38 @@ extern const uint16_t touch_key_array[TOUCH_KEY_NUM];
 #if WAKEUP_GESTURE
 extern const uint16_t gesture_key_array[];
 #endif
-#define BOOT_UPDATE_FIRMWARE 0
-#define BOOT_UPDATE_FIRMWARE_NAME "novatek_ts_fw.bin"
+#define BOOT_UPDATE_FIRMWARE 1
+#define BOOT_UPDATE_FIRMWARE_NAME "novatek_nt36672_e10.fw"
 
 //---ESD Protect.---
 #define NVT_TOUCH_ESD_PROTECT 0
 #define NVT_TOUCH_ESD_CHECK_PERIOD 1500	/* ms */
 
+struct nvt_config_info {
+	u8 tp_vendor;
+	u8 tp_color;
+	u8 tp_hw_version;
+	const char *nvt_cfg_name;
+	const char *nvt_limit_name;
+};
+
 struct nvt_ts_data {
 	struct i2c_client *client;
 	struct input_dev *input_dev;
 	struct delayed_work nvt_fwu_work;
+
+	struct regulator *vddio_reg;
+	struct regulator *lab_reg;
+	struct regulator *ibb_reg;
+	struct nvt_config_info *config_array;
+	struct pinctrl *ts_pinctrl;
+	struct pinctrl_state *pinctrl_state_active;
+	struct pinctrl_state *pinctrl_state_suspend;
+	const char *vddio_reg_name;
+	const char *lab_reg_name;
+	const char *ibb_reg_name;
+	const char *fw_name;
+
 	uint16_t addr;
 	int8_t phys[32];
 #if defined(CONFIG_FB)
@@ -122,6 +147,9 @@ struct nvt_ts_data {
 	uint8_t xbuf[1025];
 	struct mutex xbuf_lock;
 	bool irq_enabled;
+
+	size_t config_array_size;
+	int current_index;
 };
 
 #if NVT_TOUCH_PROC
