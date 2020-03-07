@@ -24,6 +24,7 @@
 #include <linux/input/mt.h>
 #include <linux/of_gpio.h>
 #include <linux/of_irq.h>
+#include <linux/regulator/consumer.h>
 
 #if defined(CONFIG_FB)
 #ifdef CONFIG_DRM_MSM
@@ -769,9 +770,13 @@ return:
 	n.a.
 *******************************************************/
 #ifdef CONFIG_OF
-static void nvt_parse_dt(struct device *dev)
+static int nvt_parse_dt(struct device *dev)
 {
-	struct device_node *np = dev->of_node;
+	struct device_node *mi, *np = dev->of_node;
+	struct nvt_config_info *config_info;
+	int retval;
+	u32 temp_val;
+	const char *name;
 
 #if NVT_TOUCH_SUPPORT_HW_RST
 	ts->reset_gpio = of_get_named_gpio_flags(np, "novatek,reset-gpio", 0, &ts->reset_flags);
@@ -780,16 +785,224 @@ static void nvt_parse_dt(struct device *dev)
 	ts->irq_gpio = of_get_named_gpio_flags(np, "novatek,irq-gpio", 0, &ts->irq_flags);
 	NVT_LOG("novatek,irq-gpio=%d\n", ts->irq_gpio);
 
+	retval = of_property_read_string(np, "novatek,vddio-reg-name", &name);
+	if (retval == -EINVAL)
+		ts->vddio_reg_name = NULL;
+	else if (retval < 0)
+		return -EINVAL;
+	else {
+		ts->vddio_reg_name = name;
+		NVT_LOG("vddio_reg_name = %s\n", name);
+	}
+
+	retval = of_property_read_string(np, "novatek,lab-reg-name", &name);
+	if (retval < 0)
+		ts->lab_reg_name = NULL;
+	else {
+		ts->lab_reg_name = name;
+		NVT_LOG("lab_reg_name = %s\n", name);
+	}
+
+	retval = of_property_read_string(np, "novatek,ibb-reg-name", &name);
+	if (retval < 0)
+		ts->ibb_reg_name = NULL;
+	else {
+		ts->ibb_reg_name = name;
+		NVT_LOG("ibb_reg_name = %s\n", name);
+	}
+
+
+	retval = of_property_read_u32(np, "novatek,config-array-size",
+				 (u32 *) &ts->config_array_size);
+	if (retval) {
+		NVT_LOG("Unable to get array size\n");
+		return retval;
+	}
+
+	ts->config_array = devm_kzalloc(dev, ts->config_array_size *
+					   sizeof(struct nvt_config_info),
+					   GFP_KERNEL);
+
+	if (!ts->config_array) {
+		NVT_LOG("Unable to allocate memory\n");
+		return -ENOMEM;
+	}
+
+	config_info = ts->config_array;
+	for_each_child_of_node(np, mi) {
+		retval = of_property_read_u32(mi,
+				"novatek,tp-vendor", &temp_val);
+		if (retval) {
+			NVT_LOG("Unable to read tp vendor\n");
+		} else {
+			config_info->tp_vendor = (u8) temp_val;
+			NVT_LOG("tp vendor: %u", config_info->tp_vendor);
+		}
+
+		retval = of_property_read_u32(mi,
+				"novatek,hw-version", &temp_val);
+		if (retval) {
+			NVT_LOG("Unable to read tp hw version\n");
+		} else {
+			config_info->tp_hw_version = (u8) temp_val;
+			NVT_LOG("tp hw version: %u",
+				config_info->tp_hw_version);
+		}
+
+		retval = of_property_read_string(mi, "novatek,fw-name",
+						 &config_info->nvt_cfg_name);
+		if (retval && (retval != -EINVAL))
+			NVT_LOG("Unable to read cfg name\n");
+		else
+			NVT_LOG("fw_name: %s", config_info->nvt_cfg_name);
+
+		retval = of_property_read_string(mi, "novatek,limit-name",
+						 &config_info->nvt_limit_name);
+		if (retval && (retval != -EINVAL))
+			NVT_LOG("Unable to read limit name\n");
+		else
+			NVT_LOG("limit_name: %s", config_info->nvt_limit_name);
+
+		config_info++;
+	}
+
+	return 0;
 }
 #else
-static void nvt_parse_dt(struct device *dev)
+static int nvt_parse_dt(struct device *dev)
 {
 #if NVT_TOUCH_SUPPORT_HW_RST
 	ts->reset_gpio = NVTTOUCH_RST_PIN;
 #endif
 	ts->irq_gpio = NVTTOUCH_INT_PIN;
+
+	return 0;
 }
 #endif
+
+static const char *nvt_get_config(struct nvt_ts_data *ts)
+{
+	int i;
+
+	if (i >= ts->config_array_size) {
+		NVT_LOG("can't find right config\n");
+		return BOOT_UPDATE_FIRMWARE_NAME;
+	}
+
+	NVT_LOG("Choose config %d: %s", i,
+		 ts->config_array[i].nvt_cfg_name);
+	ts->current_index = i;
+	return ts->config_array[i].nvt_cfg_name;
+}
+
+static int nvt_get_reg(struct nvt_ts_data *ts, bool get)
+{
+	int retval;
+
+	if (!get) {
+		retval = 0;
+		goto regulator_put;
+	}
+
+	if ((ts->vddio_reg_name != NULL) && (*ts->vddio_reg_name != 0)) {
+		ts->vddio_reg = regulator_get(&ts->client->dev,
+				ts->vddio_reg_name);
+		if (IS_ERR(ts->vddio_reg)) {
+			NVT_ERR("Failed to get power regulator\n");
+			retval = PTR_ERR(ts->vddio_reg);
+			goto regulator_put;
+		}
+	}
+
+	if ((ts->lab_reg_name != NULL) && (*ts->lab_reg_name != 0)) {
+		ts->lab_reg = regulator_get(&ts->client->dev,
+				ts->lab_reg_name);
+		if (IS_ERR(ts->lab_reg)) {
+			NVT_ERR("Failed to get lab regulator\n");
+			retval = PTR_ERR(ts->lab_reg);
+			goto regulator_put;
+		}
+	}
+
+	if ((ts->ibb_reg_name != NULL) && (*ts->ibb_reg_name != 0)) {
+		ts->ibb_reg = regulator_get(&ts->client->dev,
+				ts->ibb_reg_name);
+		if (IS_ERR(ts->ibb_reg)) {
+			NVT_ERR("Failed to get ibb regulator\n");
+			retval = PTR_ERR(ts->ibb_reg);
+			goto regulator_put;
+		}
+	}
+
+	return 0;
+
+regulator_put:
+	if (ts->vddio_reg) {
+		regulator_put(ts->vddio_reg);
+		ts->vddio_reg = NULL;
+	}
+	if (ts->lab_reg) {
+		regulator_put(ts->lab_reg);
+		ts->lab_reg = NULL;
+	}
+	if (ts->ibb_reg) {
+		regulator_put(ts->ibb_reg);
+		ts->ibb_reg = NULL;
+	}
+
+	return retval;
+}
+
+static int nvt_enable_reg(struct nvt_ts_data *ts, bool enable)
+{
+	int retval;
+
+	if (!enable) {
+		retval = 0;
+		goto disable_ibb_reg;
+	}
+
+	if (ts->vddio_reg) {
+		retval = regulator_enable(ts->vddio_reg);
+		if (retval < 0) {
+			NVT_ERR("Failed to enable vddio regulator\n");
+			goto exit;
+		}
+	}
+
+	if (ts->lab_reg && ts->lab_reg) {
+		retval = regulator_enable(ts->lab_reg);
+		if (retval < 0) {
+			NVT_ERR("Failed to enable lab regulator\n");
+			goto disable_vddio_reg;
+		}
+	}
+
+	if (ts->ibb_reg) {
+		retval = regulator_enable(ts->ibb_reg);
+		if (retval < 0) {
+			NVT_ERR("Failed to enable ibb regulator\n");
+			goto disable_lab_reg;
+		}
+	}
+
+	return 0;
+
+disable_ibb_reg:
+	if (ts->ibb_reg)
+		regulator_disable(ts->ibb_reg);
+
+disable_lab_reg:
+	if (ts->lab_reg)
+		regulator_disable(ts->lab_reg);
+
+disable_vddio_reg:
+	if (ts->vddio_reg)
+		regulator_disable(ts->vddio_reg);
+
+exit:
+	return retval;
+}
 
 /*******************************************************
 Description:
@@ -1203,6 +1416,48 @@ out:
 	return ret;
 }
 
+static int nvt_pinctrl_init(struct nvt_ts_data *nvt_data)
+{
+	int retval = 0;
+	/* Get pinctrl if target uses pinctrl */
+	nvt_data->ts_pinctrl = devm_pinctrl_get(&nvt_data->client->dev);
+
+	if (IS_ERR_OR_NULL(nvt_data->ts_pinctrl)) {
+		retval = PTR_ERR(nvt_data->ts_pinctrl);
+		NVT_ERR("Target does not use pinctrl %d\n", retval);
+		goto err_pinctrl_get;
+	}
+
+	nvt_data->pinctrl_state_active = pinctrl_lookup_state(
+			nvt_data->ts_pinctrl, PINCTRL_STATE_ACTIVE
+		);
+
+	if (IS_ERR_OR_NULL(nvt_data->pinctrl_state_active)) {
+		retval = PTR_ERR(nvt_data->pinctrl_state_active);
+		NVT_ERR("Can not lookup %s pinstate %d\n",
+			PINCTRL_STATE_ACTIVE, retval);
+		goto err_pinctrl_lookup;
+	}
+
+	nvt_data->pinctrl_state_suspend = pinctrl_lookup_state(
+			nvt_data->ts_pinctrl, PINCTRL_STATE_SUSPEND
+		);
+
+	if (IS_ERR_OR_NULL(nvt_data->pinctrl_state_suspend)) {
+		retval = PTR_ERR(nvt_data->pinctrl_state_suspend);
+		NVT_ERR("Can not lookup %s pinstate %d\n",
+			PINCTRL_STATE_SUSPEND, retval);
+		goto err_pinctrl_lookup;
+	}
+
+	return 0;
+err_pinctrl_lookup:
+	devm_pinctrl_put(nvt_data->ts_pinctrl);
+err_pinctrl_get:
+	nvt_data->ts_pinctrl = NULL;
+	return retval;
+}
+
 /*******************************************************
 Description:
 	Novatek touchscreen driver probe function.
@@ -1230,6 +1485,19 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 
 	//---parse dts---
 	nvt_parse_dt(&client->dev);
+
+	//---request and config pinctrls---
+	ret = nvt_pinctrl_init(ts);
+	if (!ret && ts->ts_pinctrl) {
+		ret = pinctrl_select_state(ts->ts_pinctrl, ts->pinctrl_state_active);
+
+		if (ret < 0) {
+			NVT_ERR("Failed to select %s pinstate %d\n",
+				PINCTRL_STATE_ACTIVE, ret);
+		}
+	} else {
+		NVT_ERR("Failed to init pinctrl\n");
+	}
 
 	//---request and config GPIOs---
 	ret = nvt_gpio_config(ts);
@@ -1327,6 +1595,9 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 		goto err_input_register_device_failed;
 	}
 
+	//--- request regulator---
+	nvt_get_reg(ts, true);
+
 	//---set int-pin & request irq---
 	client->irq = gpio_to_irq(ts->irq_gpio);
 	if (client->irq) {
@@ -1346,6 +1617,8 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 #if WAKEUP_GESTURE
 	device_init_wakeup(&ts->input_dev->dev, 1);
 #endif
+
+	ts->fw_name = nvt_get_config(ts);
 
 #if BOOT_UPDATE_FIRMWARE
 	nvt_fwu_wq = alloc_workqueue("nvt_fwu_wq", WQ_UNBOUND | WQ_MEM_RECLAIM, 1);
@@ -1677,6 +1950,18 @@ static int32_t nvt_ts_suspend(struct device *dev)
 	buf[0] = EVENT_MAP_HOST_CMD;
 	buf[1] = 0x11;
 	CTP_I2C_WRITE(ts->client, I2C_FW_Address, buf, 2);
+
+	if (ts->ts_pinctrl) {
+		ret = pinctrl_select_state(ts->ts_pinctrl,
+			ts->pinctrl_state_suspend);
+
+		if (ret < 0) {
+			NVT_ERR("Failed to select %s pinstate %d\n",
+				PINCTRL_STATE_ACTIVE, ret);
+		}
+	} else {
+		NVT_ERR("Failed to init pinctrl\n");
+	}
 #endif // WAKEUP_GESTURE
 
 	mutex_unlock(&ts->lock);
@@ -1727,7 +2012,7 @@ static int32_t nvt_ts_resume(struct device *dev)
 #endif
 
 	// need to uncomment the following code for NT36672, NT36772 IC due to no boot-load when RESX/TP_RESX
-	//nvt_bootloader_reset();
+	nvt_bootloader_reset();
 	if (nvt_check_fw_reset_state(RESET_STATE_REK)) {
 		NVT_ERR("FW is not ready! Try to bootloader reset...\n");
 		nvt_bootloader_reset();
@@ -1736,6 +2021,18 @@ static int32_t nvt_ts_resume(struct device *dev)
 
 #if !WAKEUP_GESTURE
 	nvt_irq_enable(true);
+
+	if (ts->ts_pinctrl) {
+		ret = pinctrl_select_state(ts->ts_pinctrl,
+			ts->pinctrl_state_active);
+
+		if (ret < 0) {
+			NVT_ERR("Failed to select %s pinstate %d\n",
+				PINCTRL_STATE_ACTIVE, ret);
+		}
+	} else {
+		NVT_ERR("Failed to init pinctrl\n");
+	}
 #endif
 
 #if NVT_TOUCH_ESD_PROTECT
@@ -1771,11 +2068,13 @@ static int nvt_drm_notifier_callback(struct notifier_block *self, unsigned long 
 		if (event == MSM_DRM_EARLY_EVENT_BLANK) {
 			if (*blank == MSM_DRM_BLANK_POWERDOWN) {
 				NVT_LOG("event=%lu, *blank=%d\n", event, *blank);
+				nvt_enable_reg(ts, true);
 				nvt_ts_suspend(&ts->client->dev);
 			}
 		} else if (event == MSM_DRM_EVENT_BLANK) {
 			if (*blank == MSM_DRM_BLANK_UNBLANK) {
 				NVT_LOG("event=%lu, *blank=%d\n", event, *blank);
+				nvt_enable_reg(ts, false);
 				nvt_ts_resume(&ts->client->dev);
 			}
 		}
