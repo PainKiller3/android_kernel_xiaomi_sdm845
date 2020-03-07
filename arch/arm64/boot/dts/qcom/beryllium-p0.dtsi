@@ -473,16 +473,16 @@
 		status = "ok";
 
 		vddio-supply = <&pm8998_l14>;
-		/*avdd-supply = <&pm8994_l22>;*/
+		/* avdd-supply = <&pm8994_l22>; */
 		lab-supply = <&lab_regulator>;
 		ibb-supply = <&ibb_regulator>;
 		novatek,vddio-reg-name = "vddio";
 		novatek,lab-reg-name = "lab";
 		novatek,ibb-reg-name = "ibb";
 
-		novatek,reset-tddi = <&tlmm 6 0x00>;
 		novatek,reset-gpio = <&tlmm 32 0x00>;
 		novatek,irq-gpio = <&tlmm 31 0x2001>;
+
 		pinctrl-names = "pmx_ts_active", "pmx_ts_suspend";
 		pinctrl-0 = <&ts_int_active &ts_reset_active>;
 		pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
@@ -499,7 +499,7 @@
 		};
 
 		/* MP */
-		/*novatek,mp-support-dt;*/
+		/* novatek,mp-support-dt; */
 	};
 	focaltech@38 {
 		compatible = "focaltech,fts";
