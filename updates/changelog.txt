@@ -1,6 +1,9 @@
-- Upstream to v4.9.214
-- Fix network signal guru
-- Enable NAP power saving state for Adreno 630 GPU
-- Some dts_eagle changes
-- Miscellaneous changes and improvements
-- Added permissive kernel as seperate file (useful for ppl who use audio mods)
+- Updated to latest Linux tag 4.9.215
+- Added blu_scheduti governor
+- Added boeffla wakelock blocker
+- Added zen scheduler
+- Reduced cache pressure
+- Adjusted dirty ratio percentage
+- Lot of udh changes
+- Performance and battery improvements
+- Los upstream
