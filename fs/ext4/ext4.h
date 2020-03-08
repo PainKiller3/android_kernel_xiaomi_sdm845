@@ -1518,7 +1518,6 @@ struct ext4_sb_info {
 	 * or EXTENTS flag.
 	 */
 	struct percpu_rw_semaphore s_writepages_rwsem;
-
 };
 
 static inline struct ext4_sb_info *EXT4_SB(struct super_block *sb)
