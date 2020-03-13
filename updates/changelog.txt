@@ -1,6 +1,4 @@
-- Upstream to v4.9.214
-- Fix network signal guru
-- Enable NAP power saving state for Adreno 630 GPU
-- Some dts_eagle changes
-- Miscellaneous changes and improvements
-- Added permissive kernel as seperate file (useful for ppl who use audio mods)
+Changelog:
+- Upstream to latest linux tag v4.9.216
+- Fixed network speed monitor in MIUI
+- Fixed blu_scheduti governor & zen scheduler
