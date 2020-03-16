@@ -23,7 +23,7 @@
 #include "nt36xxx.h"
 #include "nt36xxx_mp_ctrlram.h"
 
-#ifdef CONFIG_TOUCHSCREEN_NT36XXX_MP_CTRLRAM
+#ifdef CONFIG_TOUCHSCREEN_NT36xxx_MP_CTRLRAM
 
 #define NORMAL_MODE 0x00
 #define TEST_MODE_1 0x21
@@ -1210,9 +1210,9 @@ static int32_t nvt_selftest_open(struct inode *inode, struct file *file)
 		return -ERESTARTSYS;
 	}
 
-#ifdef CONFIG_TOUCHSCREEN_NT36XXX_ESD_PROTECT
+#if NVT_TOUCH_ESD_PROTECT
 	nvt_esd_check_enable(false);
-#endif /* ifdef CONFIG_TOUCHSCREEN_NT36XXX_ESD_PROTECT */
+#endif /* #if NVT_TOUCH_ESD_PROTECT */
 
 	if (nvt_get_fw_info()) {
 		mutex_unlock(&ts->lock);
@@ -1232,7 +1232,7 @@ static int32_t nvt_selftest_open(struct inode *inode, struct file *file)
 		 * Ex. nvt_pid = 500A
 		 *     mpcriteria = "novatek-mp-criteria-500A"
 		 */
-		snprintf(mpcriteria, PAGE_SIZE, "novatek-mp-criteria-%04X", ts->nvt_pid);
+		snprintf(mpcriteria, sizeof(mpcriteria), "novatek-mp-criteria-%04X", ts->nvt_pid);
 
 		if (nvt_mp_parse_dt(np, mpcriteria)) {
 			mutex_unlock(&ts->lock);
@@ -1617,4 +1617,4 @@ void nvt_mp_proc_deinit(void)
 		NVT_LOG("Removed /proc/%s\n", "nvt_selftest");
 	}
 }
-#endif /* CONFIG_TOUCHSCREEN_NT36XXX_MP_CTRLRAM */
+#endif /* CONFIG_TOUCHSCREEN_NT36xxx_MP_CTRLRAM */

@@ -19,6 +19,7 @@
 
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/delay.h>
 
 #include "nt36xxx.h"
 
@@ -27,6 +28,8 @@
 #define NVT_BASELINE "nvt_baseline"
 #define NVT_RAW "nvt_raw"
 #define NVT_DIFF "nvt_diff"
+#define NVT_XIAOMI_CONFIG_INFO "nvt_xiaomi_config_info"
+#define NVT_XIAOMI_LOCKDOWN_INFO "tp_lockdown_info"
 
 #define BUS_TRANSFER_LENGTH  64
 
@@ -37,13 +40,33 @@
 
 #define XDATA_SECTOR_SIZE   256
 
+extern int32_t Init_BootLoader(void);
+extern int32_t Resume_PD(void);
+
 static uint8_t xdata_tmp[2048] = {0};
 static int32_t xdata[2048] = {0};
+static int32_t xdata_i[2048] = {0};
+static int32_t xdata_q[2048] = {0};
 
 static struct proc_dir_entry *NVT_proc_fw_version_entry;
 static struct proc_dir_entry *NVT_proc_baseline_entry;
 static struct proc_dir_entry *NVT_proc_raw_entry;
 static struct proc_dir_entry *NVT_proc_diff_entry;
+static struct proc_dir_entry *NVT_proc_xiaomi_config_info_entry;
+static struct proc_dir_entry *NVT_proc_xiaomi_lockdown_info_entry;
+
+/* Xiaomi Config Info. */
+static uint8_t nvt_xiaomi_conf_info_fw_ver;
+static uint8_t nvt_xiaomi_conf_info_fae_id;
+static uint64_t nvt_xiaomi_conf_info_reservation;
+/* Xiaomi Lockdown Info */
+static uint8_t tp_maker_cg_lamination;
+static uint8_t display_maker;
+static uint8_t cg_ink_color;
+static uint8_t hw_version;
+static uint16_t project_id;
+static uint8_t cg_maker;
+static uint8_t reservation_byte;
 
 /*******************************************************
 Description:
@@ -81,7 +104,7 @@ return:
 *******************************************************/
 uint8_t nvt_get_fw_pipe(void)
 {
-	uint8_t buf[8]= {0};
+	uint8_t buf[8] = {0};
 
 	//---set xdata index to EVENT BUF ADDR---
 	nvt_set_page(I2C_FW_Address, ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_HANDSHAKING_or_SUB_CMD_BYTE);
@@ -120,8 +143,6 @@ void nvt_read_mdata(uint32_t xdata_addr, uint32_t xdata_btn_addr)
 	data_len = ts->x_num * ts->y_num * 2;
 	residual_len = (head_addr + dummy_len + data_len) % XDATA_SECTOR_SIZE;
 
-	//printk("head_addr=0x%05X, dummy_len=0x%05X, data_len=0x%05X, residual_len=0x%05X\n", head_addr, dummy_len, data_len, residual_len);
-
 	//read xdata : step 1
 	for (i = 0; i < ((dummy_len + data_len) / XDATA_SECTOR_SIZE); i++) {
 		//---change xdata index---
@@ -136,10 +157,8 @@ void nvt_read_mdata(uint32_t xdata_addr, uint32_t xdata_btn_addr)
 			//---copy buf to xdata_tmp---
 			for (k = 0; k < BUS_TRANSFER_LENGTH; k++) {
 				xdata_tmp[XDATA_SECTOR_SIZE * i + BUS_TRANSFER_LENGTH * j + k] = buf[k + 1];
-				//printk("0x%02X, 0x%04X\n", buf[k+1], (XDATA_SECTOR_SIZE*i + BUS_TRANSFER_LENGTH*j + k));
 			}
 		}
-		//printk("addr=0x%05X\n", (head_addr+XDATA_SECTOR_SIZE*i));
 	}
 
 	//read xdata : step2
@@ -156,10 +175,8 @@ void nvt_read_mdata(uint32_t xdata_addr, uint32_t xdata_btn_addr)
 			//---copy buf to xdata_tmp---
 			for (k = 0; k < BUS_TRANSFER_LENGTH; k++) {
 				xdata_tmp[(dummy_len + data_len - residual_len) + BUS_TRANSFER_LENGTH * j + k] = buf[k + 1];
-				//printk("0x%02X, 0x%04x\n", buf[k+1], ((dummy_len+data_len-residual_len) + BUS_TRANSFER_LENGTH*j + k));
 			}
 		}
-		//printk("addr=0x%05X\n", (xdata_addr+data_len-residual_len));
 	}
 
 	//---remove dummy data and 2bytes-to-1data---
@@ -188,6 +205,31 @@ void nvt_read_mdata(uint32_t xdata_addr, uint32_t xdata_btn_addr)
 
 /*******************************************************
 Description:
+	Novatek touchscreen read meta data from IQ to rss function.
+
+return:
+	n.a.
+*******************************************************/
+void nvt_read_mdata_rss(uint32_t xdata_i_addr, uint32_t xdata_q_addr, uint32_t xdata_btn_i_addr, uint32_t xdata_btn_q_addr)
+{
+	int i = 0;
+
+	mutex_lock(&ts->mdata_lock);
+
+	nvt_read_mdata(xdata_i_addr, xdata_btn_i_addr);
+	memcpy(xdata_i, xdata, ((ts->x_num * ts->y_num + TOUCH_KEY_NUM) * sizeof(int32_t)));
+
+	nvt_read_mdata(xdata_q_addr, xdata_btn_q_addr);
+	memcpy(xdata_q, xdata, ((ts->x_num * ts->y_num + TOUCH_KEY_NUM) * sizeof(int32_t)));
+
+	for (i = 0; i < (ts->x_num * ts->y_num + TOUCH_KEY_NUM); i++) {
+		xdata[i] = (int32_t)int_sqrt((unsigned long)(xdata_i[i] * xdata_i[i]) + (unsigned long)(xdata_q[i] * xdata_q[i]));
+	}
+	mutex_unlock(&ts->mdata_lock);
+}
+
+/*******************************************************
+Description:
     Novatek touchscreen get meta data function.
 
 return:
@@ -197,7 +239,8 @@ void nvt_get_mdata(int32_t *buf, uint8_t *m_x_num, uint8_t *m_y_num)
 {
     *m_x_num = ts->x_num;
     *m_y_num = ts->y_num;
-    memcpy(buf, xdata, ((ts->x_num * ts->y_num + TOUCH_KEY_NUM) * sizeof(int32_t)));
+
+	memcpy(buf, xdata, ((ts->x_num * ts->y_num + TOUCH_KEY_NUM) * sizeof(int32_t)));
 }
 
 /*******************************************************
@@ -311,15 +354,14 @@ return:
 *******************************************************/
 static int32_t nvt_fw_version_open(struct inode *inode, struct file *file)
 {
-	if (mutex_lock_interruptible(&ts->lock)) {
+	if (mutex_lock_interruptible(&ts->lock))
 		return -ERESTARTSYS;
-	}
 
 	NVT_LOG("++\n");
 
-#ifdef CONFIG_TOUCHSCREEN_NT36XXX_ESD_PROTECT
+#if NVT_TOUCH_ESD_PROTECT
 	nvt_esd_check_enable(false);
-#endif /* ifdef CONFIG_TOUCHSCREEN_NT36XXX_ESD_PROTECT */
+#endif /* #if NVT_TOUCH_ESD_PROTECT */
 
 	if (nvt_get_fw_info()) {
 		mutex_unlock(&ts->lock);
@@ -350,15 +392,14 @@ return:
 *******************************************************/
 static int32_t nvt_baseline_open(struct inode *inode, struct file *file)
 {
-	if (mutex_lock_interruptible(&ts->lock)) {
+	if (mutex_lock_interruptible(&ts->lock))
 		return -ERESTARTSYS;
-	}
 
 	NVT_LOG("++\n");
 
-#ifdef CONFIG_TOUCHSCREEN_NT36XXX_ESD_PROTECT
+#if NVT_TOUCH_ESD_PROTECT
 	nvt_esd_check_enable(false);
-#endif /* ifdef CONFIG_TOUCHSCREEN_NT36XXX_ESD_PROTECT */
+#endif /* #if NVT_TOUCH_ESD_PROTECT */
 
 	if (nvt_clear_fw_status()) {
 		mutex_unlock(&ts->lock);
@@ -405,15 +446,14 @@ return:
 *******************************************************/
 static int32_t nvt_raw_open(struct inode *inode, struct file *file)
 {
-	if (mutex_lock_interruptible(&ts->lock)) {
+	if (mutex_lock_interruptible(&ts->lock))
 		return -ERESTARTSYS;
-	}
 
 	NVT_LOG("++\n");
 
-#ifdef CONFIG_TOUCHSCREEN_NT36XXX_ESD_PROTECT
+#if NVT_TOUCH_ESD_PROTECT
 	nvt_esd_check_enable(false);
-#endif /* ifdef CONFIG_TOUCHSCREEN_NT36XXX_ESD_PROTECT */
+#endif /* #if NVT_TOUCH_ESD_PROTECT */
 
 	if (nvt_clear_fw_status()) {
 		mutex_unlock(&ts->lock);
@@ -463,15 +503,14 @@ return:
 *******************************************************/
 static int32_t nvt_diff_open(struct inode *inode, struct file *file)
 {
-	if (mutex_lock_interruptible(&ts->lock)) {
+	if (mutex_lock_interruptible(&ts->lock))
 		return -ERESTARTSYS;
-	}
 
 	NVT_LOG("++\n");
 
-#ifdef CONFIG_TOUCHSCREEN_NT36XXX_ESD_PROTECT
+#if NVT_TOUCH_ESD_PROTECT
 	nvt_esd_check_enable(false);
-#endif /* ifdef CONFIG_TOUCHSCREEN_NT36XXX_ESD_PROTECT */
+#endif /* #if NVT_TOUCH_ESD_PROTECT */
 
 	if (nvt_clear_fw_status()) {
 		mutex_unlock(&ts->lock);
@@ -512,6 +551,280 @@ static const struct file_operations nvt_diff_fops = {
 	.release = seq_release,
 };
 
+static int nvt_xiaomi_config_info_show(struct seq_file *m, void *v)
+{
+	seq_printf(m, "FW version/Config version, Debug version: 0x%02X\n", nvt_xiaomi_conf_info_fw_ver);
+	seq_printf(m, "FAE ID: 0x%02X\n", nvt_xiaomi_conf_info_fae_id);
+	seq_printf(m, "Reservation byte: 0x%012llX\n", nvt_xiaomi_conf_info_reservation);
+
+	return 0;
+}
+
+static int32_t nvt_xiaomi_config_info_open(struct inode *inode, struct file *file)
+{
+	uint8_t buf[16] = {0};
+
+	if (mutex_lock_interruptible(&ts->lock))
+		return -ERESTARTSYS;
+	NVT_LOG("++\n");
+
+#if NVT_TOUCH_ESD_PROTECT
+	nvt_esd_check_enable(false);
+#endif /* #if NVT_TOUCH_ESD_PROTECT */
+
+	/*---set xdata index to EVENT BUF ADDR---*/
+	buf[0] = 0xFF;
+	buf[1] = (ts->mmap->EVENT_BUF_ADDR >> 16) & 0xFF;
+	buf[2] = (ts->mmap->EVENT_BUF_ADDR >> 8) & 0xFF;
+	CTP_I2C_WRITE(ts->client, I2C_FW_Address, buf, 3);
+
+	buf[0] = 0x9C;
+	CTP_I2C_READ(ts->client, I2C_FW_Address, buf, 9);
+
+	nvt_xiaomi_conf_info_fw_ver = buf[1];
+	nvt_xiaomi_conf_info_fae_id = buf[2];
+	nvt_xiaomi_conf_info_reservation = (((uint64_t)buf[3] << 40) | ((uint64_t)buf[4] << 32) | ((uint64_t)buf[5] << 24) | ((uint64_t)buf[6] << 16) | ((uint64_t)buf[7] << 8) | (uint64_t)buf[8]);
+
+	mutex_unlock(&ts->lock);
+
+	NVT_LOG("--\n");
+
+	return single_open(file, nvt_xiaomi_config_info_show, NULL);
+}
+
+static const struct file_operations nvt_xiaomi_config_info_fops = {
+	.owner = THIS_MODULE,
+	.open = nvt_xiaomi_config_info_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+static int32_t nvt_get_oem_data(uint8_t *data, uint32_t flash_address, int32_t size)
+{
+	uint8_t buf[64] = {0};
+	uint8_t tmp_data[512] = {0};
+	int32_t count_256 = 0;
+	uint32_t cur_flash_addr = 0;
+	uint32_t cur_sram_addr = 0;
+	uint16_t checksum_get = 0;
+	uint16_t checksum_cal = 0;
+	int32_t i = 0;
+	int32_t j = 0;
+	int32_t ret = 0;
+	int32_t retry = 0;
+
+	NVT_LOG("++\n");
+
+	/* maximum 256 bytes each read */
+	if (size % 256)
+		count_256 = size / 256 + 1;
+	else
+		count_256 = size / 256;
+
+get_oem_data_retry:
+	nvt_sw_reset_idle();
+
+	nvt_stop_crc_reboot();
+
+	/* Step 1: Initial BootLoader */
+	ret = Init_BootLoader();
+	if (ret < 0)
+		goto get_oem_data_out;
+
+	/* Step 2: Resume PD */
+	ret = Resume_PD();
+	if (ret < 0)
+		goto get_oem_data_out;
+
+	/* Step 3: Unlock */
+	buf[0] = 0x00;
+	buf[1] = 0x35;
+	CTP_I2C_WRITE(ts->client, I2C_HW_Address, buf, 2);
+	msleep(10);
+
+	for (i = 0; i < count_256; i++) {
+		cur_flash_addr = flash_address + i * 256;
+		/* Step 4: Flash Read Command */
+		buf[0] = 0x00;
+		buf[1] = 0x03;
+		buf[2] = ((cur_flash_addr >> 16) & 0xFF);
+		buf[3] = ((cur_flash_addr >> 8) & 0xFF);
+		buf[4] = (cur_flash_addr & 0xFF);
+		buf[5] = 0x00;
+		buf[6] = 0xFF;
+		CTP_I2C_WRITE(ts->client, I2C_HW_Address, buf, 7);
+		msleep(10);
+		/* Check 0xAA (Read Command) */
+		buf[0] = 0x00;
+		buf[2] = 0x00;
+		CTP_I2C_READ(ts->client, I2C_HW_Address, buf, 2);
+		if (buf[1] != 0xAA) {
+			NVT_ERR("Check 0xAA (Read Command) error!! status=0x%02X\n", buf[1]);
+			ret = -1;
+			goto get_oem_data_out;
+		}
+		msleep(10);
+
+		/* Step 5: Read Data and Checksum */
+		for (j = 0; j < ((256 / 32) + 1); j++) {
+			cur_sram_addr = ts->mmap->READ_FLASH_CHECKSUM_ADDR + j * 32;
+			buf[0] = 0xFF;
+			buf[1] = (cur_sram_addr >> 16) & 0xFF;
+			buf[2] = (cur_sram_addr  >> 8) & 0xFF;
+			CTP_I2C_WRITE(ts->client, I2C_BLDR_Address, buf, 3);
+
+			buf[0] = cur_sram_addr & 0xFF;
+
+			CTP_I2C_READ(ts->client, I2C_BLDR_Address, buf, 33);
+
+			memcpy(tmp_data + j * 32, buf + 1, 32);
+
+		}
+		/* get checksum of the 256 bytes data read */
+		checksum_get = (uint16_t)((tmp_data[1] << 8) | tmp_data[0]);
+		/* calculate checksum of of the 256 bytes data read */
+		checksum_cal = (uint16_t)((cur_flash_addr >> 16) & 0xFF) + (uint16_t)((cur_flash_addr >> 8) & 0xFF) + (cur_flash_addr & 0xFF) + 0x00 + 0xFF;
+		for (j = 0; j < 256; j++)
+			checksum_cal += tmp_data[j + 2];
+		checksum_cal = 65535 - checksum_cal + 1;
+		/*NVT_LOG("checksum_get = 0x%04X, checksum_cal = 0x%04X\n", checksum_get, checksum_cal);*/
+		/* compare the checksum got and calculated */
+		if (checksum_get != checksum_cal) {
+			if (retry < 3) {
+				retry++;
+				goto get_oem_data_retry;
+			} else {
+				NVT_ERR("Checksum not match error! checksum_get=0x%04X, checksum_cal=0x%04X, i=%d\n", checksum_get, checksum_cal, i);
+				ret = -2;
+				goto get_oem_data_out;
+			}
+		}
+
+		/* Step 6: Remapping (Remove 2 Bytes Checksum) */
+		if ((i + 1) * 256 > size)
+			memcpy(data + i * 256, tmp_data + 2, size - i * 256);
+		else
+			memcpy(data + i * 256, tmp_data + 2, 256);
+	}
+
+get_oem_data_out:
+	nvt_bootloader_reset();
+	nvt_check_fw_reset_state(RESET_STATE_INIT);
+
+	NVT_LOG("--\n");
+
+	return ret;
+}
+
+static int32_t nvt_get_xiaomi_lockdown_info(void)
+{
+	uint8_t data_buf[8] = {0};
+	int ret = 0;
+
+	ret = nvt_get_oem_data(data_buf, 0x1E000, 8);
+
+	if (ret < 0) {
+		NVT_ERR("get oem data failed!\n");
+	} else {
+		tp_maker_cg_lamination = data_buf[0];
+		NVT_LOG("The maker of Touch Panel & CG Lamination: 0x%02X\n", tp_maker_cg_lamination);
+		display_maker = data_buf[1];
+		NVT_LOG("Display maker: 0x%02X\n", display_maker);
+		cg_ink_color = data_buf[2];
+		NVT_LOG("CG ink color: 0x%02X\n", cg_ink_color);
+		hw_version = data_buf[3];
+		NVT_LOG("HW version: 0x%02X\n", hw_version);
+		project_id = ((data_buf[4] << 8) | data_buf[5]);
+		NVT_LOG("Project ID: 0x%04X\n", project_id);
+		cg_maker = data_buf[6];
+		NVT_LOG("CG maker: 0x%02X\n", cg_maker);
+		reservation_byte = data_buf[7];
+		NVT_LOG("Reservation byte: 0x%02X\n", reservation_byte);
+	}
+
+	return ret;
+}
+
+static int nvt_xiaomi_lockdown_info_show(struct seq_file *m, void *v)
+{
+	seq_printf(m, "0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x\n", tp_maker_cg_lamination,
+															display_maker,
+															cg_ink_color,
+															hw_version,
+															(project_id&0xf0) >> 4,
+															project_id&0x0f,
+															cg_maker,
+															reservation_byte);
+
+	return 0;
+}
+
+static int32_t nvt_xiaomi_lockdown_info_open(struct inode *inode, struct file *file)
+{
+	if (mutex_lock_interruptible(&ts->lock))
+		return -ERESTARTSYS;
+
+	NVT_LOG("++\n");
+
+#if NVT_TOUCH_ESD_PROTECT
+	nvt_esd_check_enable(false);
+#endif /* #if NVT_TOUCH_ESD_PROTECT */
+
+	if (nvt_get_xiaomi_lockdown_info()) {
+		mutex_unlock(&ts->lock);
+		return -EAGAIN;
+	}
+
+	mutex_unlock(&ts->lock);
+
+	NVT_LOG("--\n");
+
+	return single_open(file, nvt_xiaomi_lockdown_info_show, NULL);
+}
+
+static const struct file_operations nvt_xiaomi_lockdown_info_fops = {
+	.owner = THIS_MODULE,
+	.open = nvt_xiaomi_lockdown_info_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+int32_t nvt_get_lockdown_info(char *lockdata)
+{
+	uint8_t data_buf[NVT_LOCKDOWN_SIZE] = {0};
+	int ret = 0;
+
+	NVT_LOG("++\n");
+
+	if (!lockdata)
+		return -ENOMEM;
+
+	if (mutex_lock_interruptible(&ts->lock))
+		return -ERESTARTSYS;
+
+#if NVT_TOUCH_ESD_PROTECT
+	nvt_esd_check_enable(false);
+#endif /* #if NVT_TOUCH_ESD_PROTECT */
+
+	ret = nvt_get_oem_data(data_buf, 0x1E000, 8);
+
+	if (ret < 0) {
+		NVT_ERR("get oem data failed!\n");
+		ret = -EINVAL;
+		goto end;
+	}
+
+	memcpy(lockdata, data_buf, NVT_LOCKDOWN_SIZE);
+
+end:
+	mutex_unlock(&ts->lock);
+	NVT_LOG("--\n");
+
+	return ret;
+}
+
 /*******************************************************
 Description:
 	Novatek touchscreen extra function proc. file node
@@ -522,7 +835,7 @@ return:
 *******************************************************/
 int32_t nvt_extra_proc_init(void)
 {
-	NVT_proc_fw_version_entry = proc_create(NVT_FW_VERSION, 0444, NULL,&nvt_fw_version_fops);
+	NVT_proc_fw_version_entry = proc_create(NVT_FW_VERSION, 0444, NULL, &nvt_fw_version_fops);
 	if (NVT_proc_fw_version_entry == NULL) {
 		NVT_ERR("create proc/%s Failed!\n", NVT_FW_VERSION);
 		return -ENOMEM;
@@ -530,7 +843,7 @@ int32_t nvt_extra_proc_init(void)
 		NVT_LOG("create proc/%s Succeeded!\n", NVT_FW_VERSION);
 	}
 
-	NVT_proc_baseline_entry = proc_create(NVT_BASELINE, 0444, NULL,&nvt_baseline_fops);
+	NVT_proc_baseline_entry = proc_create(NVT_BASELINE, 0444, NULL, &nvt_baseline_fops);
 	if (NVT_proc_baseline_entry == NULL) {
 		NVT_ERR("create proc/%s Failed!\n", NVT_BASELINE);
 		return -ENOMEM;
@@ -538,7 +851,7 @@ int32_t nvt_extra_proc_init(void)
 		NVT_LOG("create proc/%s Succeeded!\n", NVT_BASELINE);
 	}
 
-	NVT_proc_raw_entry = proc_create(NVT_RAW, 0444, NULL,&nvt_raw_fops);
+	NVT_proc_raw_entry = proc_create(NVT_RAW, 0444, NULL, &nvt_raw_fops);
 	if (NVT_proc_raw_entry == NULL) {
 		NVT_ERR("create proc/%s Failed!\n", NVT_RAW);
 		return -ENOMEM;
@@ -546,12 +859,28 @@ int32_t nvt_extra_proc_init(void)
 		NVT_LOG("create proc/%s Succeeded!\n", NVT_RAW);
 	}
 
-	NVT_proc_diff_entry = proc_create(NVT_DIFF, 0444, NULL,&nvt_diff_fops);
+	NVT_proc_diff_entry = proc_create(NVT_DIFF, 0444, NULL, &nvt_diff_fops);
 	if (NVT_proc_diff_entry == NULL) {
 		NVT_ERR("create proc/%s Failed!\n", NVT_DIFF);
 		return -ENOMEM;
 	} else {
 		NVT_LOG("create proc/%s Succeeded!\n", NVT_DIFF);
+	}
+
+	NVT_proc_xiaomi_config_info_entry = proc_create(NVT_XIAOMI_CONFIG_INFO, 0444, NULL, &nvt_xiaomi_config_info_fops);
+	if (NVT_proc_xiaomi_config_info_entry == NULL) {
+		NVT_ERR("create proc/%s Failed!\n", NVT_XIAOMI_CONFIG_INFO);
+		return -ENOMEM;
+	} else {
+		NVT_LOG("create proc/%s Succeeded!\n", NVT_XIAOMI_CONFIG_INFO);
+	}
+
+	NVT_proc_xiaomi_lockdown_info_entry = proc_create(NVT_XIAOMI_LOCKDOWN_INFO, 0444, NULL, &nvt_xiaomi_lockdown_info_fops);
+	if (NVT_proc_xiaomi_lockdown_info_entry == NULL) {
+		NVT_ERR("create proc/%s Failed!\n", NVT_XIAOMI_LOCKDOWN_INFO);
+		return -ENOMEM;
+	} else {
+		NVT_LOG("create proc/%s Succeeded!\n", NVT_XIAOMI_LOCKDOWN_INFO);
 	}
 
 	return 0;
