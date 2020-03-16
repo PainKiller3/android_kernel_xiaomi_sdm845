@@ -611,7 +611,7 @@ return:
 *******************************************************/
 static int32_t nvt_flash_proc_init(void)
 {
-	NVT_proc_entry = proc_create(DEVICE_NAME, 0444, NULL,&nvt_flash_fops);
+	NVT_proc_entry = proc_create(DEVICE_NAME, 0444, NULL, &nvt_flash_fops);
 	if (NVT_proc_entry == NULL) {
 		NVT_ERR("Failed!\n");
 		return -ENOMEM;
@@ -801,7 +801,7 @@ static int nvt_parse_dt(struct device *dev)
 
 
 	retval = of_property_read_u32(np, "novatek,config-array-size",
-				 (u32 *) &ts->config_array_size);
+				 (u32 *) & ts->config_array_size);
 	if (retval) {
 		NVT_LOG("Unable to get array size\n");
 		return retval;
@@ -833,8 +833,7 @@ static int nvt_parse_dt(struct device *dev)
 			NVT_LOG("Unable to read tp hw version\n");
 		} else {
 			config_info->tp_hw_version = (u8) temp_val;
-			NVT_LOG("tp hw version: %u",
-				config_info->tp_hw_version);
+			NVT_LOG("tp hw version: %u", config_info->tp_hw_version);
 		}
 
 		retval = of_property_read_string(mi, "novatek,fw-name",
@@ -1512,9 +1511,8 @@ static int nvt_pinctrl_init(struct nvt_ts_data *nvt_data)
 		goto err_pinctrl_get;
 	}
 
-	nvt_data->pinctrl_state_active = pinctrl_lookup_state(
-			nvt_data->ts_pinctrl, PINCTRL_STATE_ACTIVE
-		);
+	nvt_data->pinctrl_state_active
+		= pinctrl_lookup_state(nvt_data->ts_pinctrl, PINCTRL_STATE_ACTIVE);
 
 	if (IS_ERR_OR_NULL(nvt_data->pinctrl_state_active)) {
 		retval = PTR_ERR(nvt_data->pinctrl_state_active);
@@ -1523,9 +1521,8 @@ static int nvt_pinctrl_init(struct nvt_ts_data *nvt_data)
 		goto err_pinctrl_lookup;
 	}
 
-	nvt_data->pinctrl_state_suspend = pinctrl_lookup_state(
-			nvt_data->ts_pinctrl, PINCTRL_STATE_SUSPEND
-		);
+	nvt_data->pinctrl_state_suspend
+		= pinctrl_lookup_state(nvt_data->ts_pinctrl, PINCTRL_STATE_SUSPEND);
 
 	if (IS_ERR_OR_NULL(nvt_data->pinctrl_state_suspend)) {
 		retval = PTR_ERR(nvt_data->pinctrl_state_suspend);
@@ -1662,7 +1659,7 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 #endif
 
 #if WAKEUP_GESTURE
-	for (retry = 0; retry < (sizeof(gesture_key_array) / sizeof(gesture_key_array[0])); retry++) {
+	for (retry = 0; retry < ARRAY_SIZE(gesture_key_array); retry++) {
 		input_set_capability(ts->input_dev, EV_KEY, gesture_key_array[retry]);
 	}
 #endif
@@ -1703,23 +1700,17 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 	}
 	update_hardware_info(TYPE_TOUCH, 5);
 
-	ret = nvt_get_lockdown_info(ts->lockdown_info);
-
-	if (ret < 0)
-		NVT_ERR("can't get lockdown info");
-	else {
-		NVT_ERR(
-			"Lockdown:0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x\n",
-			ts->lockdown_info[0], ts->lockdown_info[1], ts->lockdown_info[2],
-			ts->lockdown_info[3], ts->lockdown_info[4], ts->lockdown_info[5],
-			ts->lockdown_info[6], ts->lockdown_info[7]);
-		update_hardware_info(TYPE_TP_MAKER, ts->lockdown_info[0] - 0x30);
-	}
-	ts->fw_name = nvt_get_config(ts);
-
 #if WAKEUP_GESTURE
 	device_init_wakeup(&ts->input_dev->dev, 1);
 #endif
+
+	update_hardware_info(TYPE_TOUCH, 5);
+	ret = nvt_get_lockdown_info(ts->lockdown_info);
+	if (ret < 0)
+		NVT_ERR("can't get lockdown info");
+	else
+		update_hardware_info(TYPE_TP_MAKER, ts->lockdown_info[0] - 0x30);
+	ts->fw_name = nvt_get_config(ts);
 
 #if BOOT_UPDATE_FIRMWARE
 	nvt_fwu_wq = alloc_workqueue("nvt_fwu_wq", WQ_UNBOUND | WQ_MEM_RECLAIM, 1);
@@ -2172,7 +2163,6 @@ static struct i2c_driver nvt_i2c_driver = {
 	.id_table	= nvt_ts_id,
 	.driver = {
 		.name	= NVT_I2C_NAME,
-		.owner	= THIS_MODULE,
 #ifdef CONFIG_OF
 		.of_match_table = nvt_match_table,
 #endif
