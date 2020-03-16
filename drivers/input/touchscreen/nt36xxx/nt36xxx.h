@@ -89,9 +89,8 @@ extern const uint16_t gesture_key_array[];
 #define BOOT_UPDATE_FIRMWARE_NAME "novatek_nt36672_e10.fw"
 
 //---ESD Protect.---
-#ifdef CONFIG_TOUCHSCREEN_NT36XXX_ESD_PROTECT
+#define NVT_TOUCH_ESD_PROTECT 0
 #define NVT_TOUCH_ESD_CHECK_PERIOD 1500	/* ms */
-#endif
 
 //---Lockdown---
 #define NVT_LOCKDOWN_SIZE	8
@@ -107,6 +106,7 @@ struct nvt_config_info {
 struct nvt_ts_data {
 	struct i2c_client *client;
 	struct input_dev *input_dev;
+	struct work_struct nvt_work;
 	struct delayed_work nvt_fwu_work;
 
 	struct nvt_config_info *config_array;
@@ -123,6 +123,7 @@ struct nvt_ts_data {
 	const char *ibb_reg_name;
 	const char *fw_name;
 
+	int result_type;
 	u8 lockdown_info[NVT_LOCKDOWN_SIZE];
 
 	uint16_t addr;
@@ -144,7 +145,9 @@ struct nvt_ts_data {
 	uint32_t irq_flags;
 	int32_t reset_gpio;
 	uint32_t reset_flags;
+	int32_t reset_tddi;
 	struct mutex lock;
+	struct mutex mdata_lock;
 	const struct nvt_ts_mem_map *mmap;
 	uint8_t carrier_system;
 	uint16_t nvt_pid;
@@ -204,9 +207,9 @@ extern int32_t nvt_get_fw_info(void);
 extern int32_t nvt_clear_fw_status(void);
 extern int32_t nvt_check_fw_status(void);
 extern int32_t nvt_set_page(uint16_t i2c_addr, uint32_t addr);
-#ifdef CONFIG_TOUCHSCREEN_NT36XXX_ESD_PROTECT
+#if NVT_TOUCH_ESD_PROTECT
 extern void nvt_esd_check_enable(uint8_t enable);
-#endif /* #ifdef CONFIG_TOUCHSCREEN_NT36XXX_ESD_PROTECT */
+#endif /* #if NVT_TOUCH_ESD_PROTECT */
 extern void nvt_stop_crc_reboot(void);
 
 extern int32_t Init_BootLoader(void);
