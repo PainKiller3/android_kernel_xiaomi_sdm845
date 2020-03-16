@@ -106,6 +106,7 @@ struct nvt_config_info {
 struct nvt_ts_data {
 	struct i2c_client *client;
 	struct input_dev *input_dev;
+	struct work_struct nvt_work;
 	struct delayed_work nvt_fwu_work;
 
 	struct nvt_config_info *config_array;
@@ -122,6 +123,7 @@ struct nvt_ts_data {
 	const char *ibb_reg_name;
 	const char *fw_name;
 
+	int result_type;
 	u8 lockdown_info[NVT_LOCKDOWN_SIZE];
 
 	uint16_t addr;
@@ -143,7 +145,9 @@ struct nvt_ts_data {
 	uint32_t irq_flags;
 	int32_t reset_gpio;
 	uint32_t reset_flags;
+	int32_t reset_tddi;
 	struct mutex lock;
+	struct mutex mdata_lock;
 	const struct nvt_ts_mem_map *mmap;
 	uint8_t carrier_system;
 	uint16_t nvt_pid;
