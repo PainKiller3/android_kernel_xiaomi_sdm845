@@ -680,6 +680,22 @@ LLVM_DIS	:= llvm-dis
 export LLVM_AR LLVM_DIS
 endif
 
+ifdef CONFIG_LTO_GCC
+LTO_CFLAGS	:= -flto -flto=jobserver -fno-fat-lto-objects \
+		   -fuse-linker-plugin -fwhole-program
+KBUILD_CFLAGS	+= $(LTO_CFLAGS)
+LTO_LDFLAGS	:= $(LTO_CFLAGS) -Wno-lto-type-mismatch -Wno-psabi \
+		   -Wno-stringop-overflow -flinker-output=nolto-rel
+LDFINAL		:= $(CONFIG_SHELL) $(srctree)/scripts/gcc-ld $(LTO_LDFLAGS)
+AR		:= $(CROSS_COMPILE)gcc-ar
+NM		:= $(CROSS_COMPILE)gcc-nm
+DISABLE_LTO	:= -fno-lto
+export DISABLE_LTO LDFINAL
+else
+LDFINAL		:= $(LD)
+export LDFINAL
+endif
+
 # The arch Makefile can set ARCH_{CPP,A,C}FLAGS to override the default
 # values of the respective KBUILD_* variables
 ARCH_CPPFLAGS :=
@@ -736,15 +752,14 @@ KBUILD_LDS_MODULE += $(srctree)/scripts/module-lto.lds
 # allow disabling only clang LTO where needed
 DISABLE_LTO_CLANG := -fno-lto
 export DISABLE_LTO_CLANG
-endif
-
-ifdef CONFIG_LTO
 LTO_CFLAGS	:= $(lto-clang-flags)
 KBUILD_CFLAGS	+= $(LTO_CFLAGS)
 
 DISABLE_LTO	:= $(DISABLE_LTO_CLANG)
 export LTO_CFLAGS DISABLE_LTO
+endif
 
+ifdef CONFIG_LTO
 # LDFINAL_vmlinux and LDFLAGS_FINAL_vmlinux can be set to override
 # the linker and flags for vmlinux_link.
 export LDFINAL_vmlinux LDFLAGS_FINAL_vmlinux
