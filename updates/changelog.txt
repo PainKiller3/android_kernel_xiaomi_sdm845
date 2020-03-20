@@ -1,10 +1,8 @@
 Changelog:
-- Initial Dipper Build
-- Introduce Adreno idler
-- Add PIXUTIL, SMURFUTIL & PIXEL_SMURFUTIL Cpu governor
-- Add state notifier driver
-- Add simplified file blocker
-- Enable PM QoS for SDM845 rotator
-- Update techpack to the latest Q sources for Xiaomi 
-- qcacld-3.0: Reduce log spam 
-- Some Backport fixes
+- Upstream to latest linux tag v4.9.217
+- Use Maple as default iosched
+- Add cpu input boost
+- Remove some unuseful features
+- Added tcp and use tcp westwood as default
+- Update dts,thermals,drm & power to the latest Q sources for Xiaomi
+- Fix Doze mode for Dipper
