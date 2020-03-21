@@ -202,12 +202,12 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 	if (symbol_prefix_char && str[0] == symbol_prefix_char)
 		sym++;
 
-	if (is_ignored_symbol(sym, stype))
-		return -1;
-
-	/* Ignore most absolute/undefined (?) symbols. */
 	if (strcmp(sym, "_text") == 0)
 		_text = s->addr;
+
+	/* Ignore most absolute/undefined (?) symbols. */
+	if (is_ignored_symbol(sym, stype))
+		return -1;
 
 	check_symbol_range(sym, s->addr, text_ranges, ARRAY_SIZE(text_ranges));
 	check_symbol_range(sym, s->addr, &percpu_range, 1);
