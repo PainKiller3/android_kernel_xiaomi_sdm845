@@ -141,10 +141,10 @@ static bool is_ignored_symbol(const char *name, char type)
 			return true;
 	}
 
-	if (type == 'U' || type == 'u')
+	if (toupper(type) == 'U')
 		return true;
 	/* exclude debugging symbols */
-	if (type == 'N' || type == 'n')
+	if (toupper(type) == 'N')
 		return true;
 
 	if (toupper(type) == 'A') {
@@ -152,9 +152,13 @@ static bool is_ignored_symbol(const char *name, char type)
 		if (strcmp(name, "__kernel_syscall_via_break") &&
 		    strcmp(name, "__kernel_syscall_via_epc") &&
 		    strcmp(name, "__kernel_sigtramp") &&
-		    strcmp(name, "__gp"))
-			return true;
+		    strcmp(name, "__gp")) {
+				return true;
+			}
 	}
+
+	if (toupper(type) == 'W' && strstr(name, ".c") != NULL)
+		return true;
 
 	return false;
 }
@@ -181,13 +185,15 @@ static void check_symbol_range(const char *sym, unsigned long long addr,
 static int read_symbol(FILE *in, struct sym_entry *s)
 {
 	char str[500];
+	char buf[LINE_MAX];
 	char *sym, stype;
 	int rc;
 
-	rc = fscanf(in, "%llx %c %499s\n", &s->addr, &stype, str);
-	if (rc != 3) {
-		if (rc != EOF && fgets(str, 500, in) == NULL)
-			fprintf(stderr, "Read error or end of file.\n");
+	if (fgets(buf, sizeof(buf), in) == NULL) {
+		return -1;
+	}
+	rc = sscanf(buf, "%llx %c %499s\n", &s->addr, &stype, str);
+	if (rc < 3) {
 		return -1;
 	}
 	if (strlen(str) > KSYM_NAME_LEN) {
