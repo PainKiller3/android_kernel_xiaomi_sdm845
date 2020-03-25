@@ -1,11 +1,11 @@
  {
   "kernel": {
-    "name": "SilverCore Kernel",
-    "version": "v3.3",
-    "link": "https://github.com/PainKiller3/kernel_xiaomi_sdm845/releases/download/3.3/SilverCore_v3.3_beryllium.zip",
+    "name": "SilverCore Kernel Beryllium",
+    "version": "v3.4",
+    "link": "https://github.com/PainKiller3/kernel_xiaomi_sdm845/releases/download/3.4/SilverCore_v3.4_beryllium.zip",
     "changelog_url": "https://raw.githubusercontent.com/PainKiller3/kernel_xiaomi_sdm845/ten/updates/changelog.txt",
-    "date": "2020-03-20",
-    "sha1": "3f1a7d0c7ed7c25cc263144d8937bb80b1653326"
+    "date": "2020-03-25",
+    "sha1": "4e021155d5c217b5d725059b2757ffe62d52e288"
   },
   "support": {
     "link": "https://t.me/reignzupdate"
