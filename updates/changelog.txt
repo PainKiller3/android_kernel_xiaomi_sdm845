@@ -1,8 +1,13 @@
 Changelog:
-- Upstream to latest linux tag v4.9.217
-- Use Maple as default iosched
-- Add cpu input boost
-- Remove some unuseful features
-- Added tcp and use tcp westwood as default
-- Update dts,thermals,drm & power to the latest Q sources for Xiaomi
-- Fix Doze mode for Dipper
+- Drop support for Mi 8 (dipper)
+- Some Thermal Improvement
+- Fix Drains (High & Active)
+- Fix memory leak here and there
+- Update devfreq boost config
+- Update boost config
+- Optimize cpu-boost
+- Enable dynamic stune boost
+- Some backport fixes
+- Add more wakelocks
+- Disable some logging
+- Import Q changes for arch / arm64, power supply & dts
