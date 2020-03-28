@@ -2,7 +2,7 @@ qcom,e10_atl_4000mah {
 	qcom, = <24>;
 	/* #3410356_Xiaomi_E10atl_4000mAh_averaged_MasterSlave_Apr10th2018*/
 	qcom,max-voltage-uv = <4400000>;
-	qcom,fastchg-current-ma = <3500>;
+	qcom,fastchg-current-ma = <3000>;
 	qcom,nom-batt-capacity-mah = <4000>;
 	qcom,fg-cc-cv-threshold-mv = <4390>;
 	qcom,batt-id-kohm = <68>;
@@ -11,7 +11,7 @@ qcom,e10_atl_4000mah {
 	qcom,jeita-fcc-ranges = <0   50   390000
 				51  100  1170000
 				101 150  1170000
-				151 450  2800000
+				151 450  3000000
 				451 600  1950000>;
 	qcom,jeita-fv-ranges =  <0   50  4400000
 				51  100  4400000
