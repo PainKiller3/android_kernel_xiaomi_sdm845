@@ -1,13 +1,5 @@
 Changelog:
-- Drop support for Mi 8 (dipper)
-- Some Thermal Improvement
-- Fix Drains (High & Active)
-- Fix memory leak here and there
-- Update devfreq boost config
-- Update boost config
-- Optimize cpu-boost
-- Enable dynamic stune boost
-- Some backport fixes
-- Add more wakelocks
-- Disable some logging
-- Import Q changes for arch / arm64, power supply & dts
+- Merge CAF "LA.UM.8.3.r1-07600-sdm845.0" tags
+- Added Spectrum & Performance Profiles
+- Merge Audio & Wlan from CAF "LA.UM.8.3.r1-07600-sdm845.0" tags
+- Update GPS to the latest Q changes from Xiaomi
