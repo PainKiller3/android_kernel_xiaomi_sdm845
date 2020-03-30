@@ -12,8 +12,8 @@ do.cleanuponabort=0
 device.name1=beryllium
 device.name2=PocoF1
 device.name3=PocophoneF1
-device.name4=
-device.name5=
+device.name4=dipper
+device.name5=MI 8
 supported.versions=10,10.0
 '; } # end properties
 
@@ -25,10 +25,6 @@ ramdisk_compression=auto;
 ## AnyKernel methods (DO NOT CHANGE)
 # import patching functions/variables - see for reference
 . tools/ak3-core.sh;
-
-## AnyKernel file attributes
-# set permissions/ownership for included ramdisk files
-set_perm_recursive 0 0 750 750 $ramdisk/*;
 
 # Set Android version for kernel
 ver="$(file_getprop /system/build.prop ro.build.version.release)"
@@ -45,9 +41,6 @@ ui_print "INSTALLING SOME SILVERCORE GOODIES"
 
 ## AnyKernel install
 dump_boot;
-
-# begin ramdisk changes
-. /tmp/anykernel/tools/silvercore.sh;
 
 # migrate from /overlay to /overlay.d to enable SAR Magisk
 if [ -d $ramdisk/overlay ]; then
