@@ -1927,6 +1927,11 @@ static inline long qcedev_ioctl(struct file *file,
 				goto exit_free_qcedev_areq;
 			}
 
+			if (map_buf.num_fds > QCEDEV_MAX_BUFFERS) {
+				err = -EINVAL;
+				return err;
+			}
+
 			for (i = 0; i < map_buf.num_fds; i++) {
 				err = qcedev_check_and_map_buffer(handle,
 						map_buf.fd[i],
