@@ -500,8 +500,6 @@ static ssize_t chip_enable_show(struct device *dev,
 
 static int idtp9220_set_present(struct idtp9220_device_info *di, int enable)
 {
-	int ret = 0;
-
 	dev_info(di->dev, "[idtp] dc plug %s\n", enable ? "in" : "out");
 	if (enable)
 	{
@@ -523,7 +521,7 @@ static int idtp9220_set_present(struct idtp9220_device_info *di, int enable)
 		cancel_delayed_work(&di->request_adapter_retry_work);
 	}
 
-	return ret;
+	return 0;
 }
 
 
@@ -985,7 +983,7 @@ static void idtp9220_set_charging_param(struct idtp9220_device_info *di)
 			adapter_vol = ADAPTER_DEFAULT_VOL;
 			icl_curr = min(DC_SDP_CURRENT, icl_curr);
 
-			if (dcin_curr_ave_init == false) {
+			if (!dcin_curr_ave_init) {
 				int i = 0;
 				for (i=0; i<6; i++) {
 					dcin_curr[i] = icl_curr;
@@ -1118,7 +1116,7 @@ static void idtp9220_request_adapter_retry_work(struct work_struct *work)
 	if (di->tx_charger_type == ADAPTER_AUTH_FAILED)
 		return;
 
-	if (di->device_auth_sucess == true) {
+	if (di->device_auth_sucess) {
 		if (di->tx_charger_type == ADAPTER_NONE && retry < 3) {
 			retry++;
 			idtp922x_request_adapter(di);
@@ -1565,17 +1563,13 @@ static int idtp9220_probe(struct i2c_client *client,
 	INIT_DELAYED_WORK(&di->request_adapter_retry_work, idtp9220_request_adapter_retry_work);
 
 #ifdef CONFIG_DRM
-		if (&di->wireless_fb_notif) {
-			di->wireless_fb_notif.notifier_call = wireless_fb_notifier_cb;
-			rc = drm_register_client(&di->wireless_fb_notif);
-			if (rc < 0) {
-				dev_err(di->dev,
-					"Couldn't register notifier rc=%d\n", rc);
-				return rc;
-			}
-			//INIT_DELAYED_WORK(&di->screen_on_work, wireless_screen_on_work);
-		} else
-			dev_err(di->dev, "Unsupported fb notifier \n");
+	di->wireless_fb_notif.notifier_call = wireless_fb_notifier_cb;
+	rc = drm_register_client(&di->wireless_fb_notif);
+	if (rc < 0) {
+		dev_err(di->dev,
+			"Couldn't register notifier rc=%d\n", rc);
+		return rc;
+	}
 #endif
 
 	dev_info(di->dev, "[idt] success probe idtp922x driver\n");
@@ -1659,7 +1653,6 @@ MODULE_DEVICE_TABLE(i2c, idtp9220_id);
 static struct i2c_driver idtp9220_driver = {
 	.driver = {
 		.name = IDT_DRIVER_NAME,
-		.owner = THIS_MODULE,
 		.of_match_table = idt_match_table,
 	},
 	.probe = idtp9220_probe,
