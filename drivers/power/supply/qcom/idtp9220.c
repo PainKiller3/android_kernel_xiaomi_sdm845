@@ -408,7 +408,7 @@ static ssize_t chip_vout_store(struct device *dev,
 		return count;
 	}
 
-	di->bus.write(di, REG_VOUT_SET, index);
+	idtp9220_set_vout(di, index);
 
 	return count;
 }
@@ -733,7 +733,7 @@ static void idtp9220_chg_detect_work(struct work_struct *work)
 
 	/*set idtp9220 into sleep mode when usbin*/
 	power_supply_get_property(di->usb_psy,
-			POWER_SUPPLY_PROP_PRESENT, &val);
+			POWER_SUPPLY_PROP_ONLINE, &val);
 	if (val.intval) {
 		dev_info(di->dev, "[idt] usb_online:%d set chip disable\n", val.intval);
 		idtp9220_set_enable_mode(di, false);
@@ -1213,7 +1213,9 @@ static void idtp9220_irq_work(struct work_struct *work)
 			dev_info(di->dev, "[idt]adapter type: %d\n", recive_data[1]);
 			di->tx_charger_type = recive_data[1];
 			schedule_delayed_work(&di->chg_monitor_work,
-								msecs_to_jiffies(0));
+								msecs_to_jiffies(1000));
+			if (di->wireless_psy)
+				power_supply_changed(di->wireless_psy);
 			break;
 		default:
 			dev_info(di->dev, "[idt] unsupport cmd: %x\n", recive_data[0]);
