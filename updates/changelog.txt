@@ -1,5 +1,10 @@
 Changelog:
-- Merge CAF "LA.UM.8.3.r1-07600-sdm845.0" tags
-- Added Spectrum & Performance Profiles
-- Merge Audio & Wlan from CAF "LA.UM.8.3.r1-07600-sdm845.0" tags
-- Update GPS to the latest Q changes from Xiaomi
+- Upstream to latest linux tag v4.9.218
+- defconfig: Add support for File-Based Encryption
+- battery: Pump the specified QC3.0 current
+- AnyKernel3: Remove Spectrum Support
+- Merge wlan/qcacld-3.0 from LA.UM.8.3.r1-07600-sdm845.0
+- UPSTREAM: ipv6: ndisc: add support for 'PREF64' dns64 prefix identifier
+- Introduce Simple LMK
+- techpack: codecs: tas255{7,9}: Strip debugging
+- halls: rewrite to remove userspace dependency
