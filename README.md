@@ -28,6 +28,7 @@ Release Date | August 2018
 - Exposure Adjustment
 - Drivedroid Support
 - State Notifier Driver & Adreno idler
+- Improve Charging rate (Thx @Dhruvgera)
 - Check commit on git for more details
 
 ## Telegram Channel

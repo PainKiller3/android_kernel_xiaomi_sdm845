@@ -1,6 +1,8 @@
 Changelog:
-- Introduce exposure adjustment driver
-- Add Drivedroid Support
-- Add USB HID Support for 4.9 Kernels 
-- Add state notifier driver 
-- Add Back Adreno idler
+- Some power / supply & input changes
+- thermal / core : Workaround for Xiaomi thermal mitigation & fixes
+- Introduce cpu_input_boost
+- Added westwood as default tcp
+- Migrate to novatek 9.1.24 beta firmware
+- Added Performace Profile in FKM
+- Improve Charging rate (Thx @Dhruvgera)
