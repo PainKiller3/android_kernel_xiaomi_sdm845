@@ -39,7 +39,6 @@
 #ifdef CONFIG_SENSORS_SSP
 #include <linux/spi/spi.h>
 
-
 extern struct spi_driver *pssp_driver;
 extern bool ssp_dbg;
 extern bool ssp_pkt_dbg;
@@ -51,19 +50,17 @@ static struct spi_device dummy_spi = {
 };
 #endif
 
-#ifdef CONFIG_BCM_GPS_SPI_DRIVER
 extern bool ssi_dbg;
 extern bool ssi_dbg_pzc;
 extern bool ssi_dbg_rng;
-#endif
 
 void bbd_log_hex(const char*, const unsigned char*, unsigned long);
 
-
-
-
-
-
+//--------------------------------------------------------------
+//
+//               BBD device struct
+//
+//--------------------------------------------------------------
 #define BBD_BUFF_SIZE (PAGE_SIZE*2)
 struct bbd_cdev_priv {
 	const char *name;
@@ -97,15 +94,15 @@ static const char *bbd_dev_name[BBD_DEVICE_INDEX] = {
 	"bbd_sensor",
 	"bbd_control",
 	"bbd_patch",
-
 };
 
 static dev_t devno;
 
-
-
-
-
+//--------------------------------------------------------------
+//
+//               Globals
+//
+//--------------------------------------------------------------
 /*
  * The global BBD device which has all necessary information.
  * It's not beautiful but useful when we debug by Trace32.
@@ -115,11 +112,6 @@ static struct bbd_device bbd;
  * Embedded patch file provided as /dev/bbd_patch
  */
 static unsigned char bbd_patch[] = {
-#ifdef CONFIG_POP
-
-#else
-
-#endif
 };
 
 #ifdef CONFIG_SENSORS_BBD_LEGACY_PATCH
@@ -136,11 +128,11 @@ static unsigned char legacy_bbd_patch[] = {
 ssize_t bbd_on_read(unsigned int minor,
 					const unsigned char *buf, size_t size);
 
-
-
-
-
-
+//--------------------------------------------------------------
+//
+//               SHMD Interface Functions
+//
+//--------------------------------------------------------------
 
 /**
  * bbd_register -Interface function called from SHMD
@@ -171,7 +163,7 @@ EXPORT_SYMBOL(bbd_register);
  */
 struct sensor_pkt {
 	unsigned short size;
-	unsigned char buf[1022];	/*We assume max SSP packet less than 1KB */
+	unsigned char buf[1022];	/* We assume max SSP packet less than 1KB */
 } __attribute__((__packed__)) ss_pkt;
 
 ssize_t bbd_send_packet(unsigned char *buf, size_t size)
@@ -259,11 +251,11 @@ EXPORT_SYMBOL(bbd_mcu_reset);
 
 
 
-
-
-
-
-
+//--------------------------------------------------------------
+//
+//               BBD device struct
+//
+//--------------------------------------------------------------
 
 /**
  * bbd_control - Handles command string from lhd
@@ -278,17 +270,13 @@ ssize_t bbd_control(const char *buf, ssize_t len)
 
 		if (bbd.ssp_cb && bbd.ssp_cb->on_mcu_ready)
 			bbd.ssp_cb->on_mcu_ready(bbd.ssp_priv, true);
-#ifdef CONFIG_BCM_GPS_SPI_DRIVER
 		bcm477x_debug_info(ESW_CTRL_READY);
-#endif
 	} else if (strnstr(buf, ESW_CTRL_NOTREADY, strlen(buf))) {
 		struct circ_buf *circ = &bbd.priv[BBD_MINOR_SENSOR].read_buf;
 		circ->head = circ->tail = 0;
 		if (bbd.ssp_cb && bbd.ssp_cb->on_mcu_ready)
 			bbd.ssp_cb->on_mcu_ready(bbd.ssp_priv, false);
-#ifdef CONFIG_BCM_GPS_SPI_DRIVER
 		bcm477x_debug_info(ESW_CTRL_NOTREADY);
-#endif
 	} else if (strnstr(buf, ESW_CTRL_CRASHED, strlen(buf))) {
 		struct circ_buf *circ = &bbd.priv[BBD_MINOR_SENSOR].read_buf;
 		circ->head = circ->tail = 0;
@@ -298,13 +286,7 @@ ssize_t bbd_control(const char *buf, ssize_t len)
 
 		if (bbd.ssp_cb && bbd.ssp_cb->on_control)
 			bbd.ssp_cb->on_control(bbd.ssp_priv, buf);
-#ifdef CONFIG_BCM_GPS_SPI_DRIVER
 		bcm477x_debug_info(ESW_CTRL_CRASHED);
-#endif
-#if 0
-	} else if (strnstr(buf, BBD_CTRL_DEBUG_ON, strlen(buf))) {
-		bbd.db = true;
-#endif
 	} else if (strnstr(buf, BBD_CTRL_DEBUG_OFF, strlen(buf))) {
 		bbd.db = false;
 #ifdef CONFIG_SENSORS_SSP
@@ -315,7 +297,6 @@ ssize_t bbd_control(const char *buf, ssize_t len)
 		ssp_dbg = false;
 		ssp_pkt_dbg = false;
 #endif
-#ifdef CONFIG_BCM_GPS_SPI_DRIVER
 	} else if (strnstr(buf, SSI_DEBUG_ON, strlen(buf))) {
 		ssi_dbg = true;
 	} else if (strnstr(buf, SSI_DEBUG_OFF, strlen(buf))) {
@@ -328,7 +309,6 @@ ssize_t bbd_control(const char *buf, ssize_t len)
 		ssi_dbg_rng = true;
 	} else if (strnstr(buf, RNG_DEBUG_OFF, strlen(buf))) {
 		ssi_dbg_rng = false;
-#endif
 	} else if (bbd.ssp_cb && bbd.ssp_cb->on_control) {
 		/* Tell SHMD about the unknown control string */
 		bbd.ssp_cb->on_control(bbd.ssp_priv, buf);
@@ -339,11 +319,11 @@ ssize_t bbd_control(const char *buf, ssize_t len)
 
 
 
-
-
-
-
-
+//--------------------------------------------------------------
+//
+//               BBD Common File Functions
+//
+//--------------------------------------------------------------
 
 /**
  * bbd_common_open - Common open function for BBD devices
@@ -382,7 +362,6 @@ static int bbd_common_release(struct inode *inode, struct file *filp)
 {
 	unsigned int minor = iminor(inode);
 
-
 	pr_info("%s++\n", __func__);
 
 	BUG_ON(minor >= BBD_DEVICE_INDEX);
@@ -404,7 +383,6 @@ static ssize_t bbd_common_read(struct file *filp,
 							   char __user *buf, size_t size, loff_t *ppos)
 {
 	unsigned int minor = iminor(filp->f_path.dentry->d_inode);
-
 	struct circ_buf *circ = &bbd.priv[minor].read_buf;
 	size_t rd_size = 0;
 
@@ -449,7 +427,6 @@ static ssize_t bbd_common_write(struct file *filp,
 {
 	unsigned int minor = iminor(filp->f_path.dentry->d_inode);
 
-
 	BUG_ON(size >= BBD_BUFF_SIZE);
 
 	WARN_ON(copy_from_user(bbd.priv[minor].write_buf, buf, size));
@@ -464,7 +441,6 @@ static ssize_t bbd_common_write(struct file *filp,
 static unsigned int bbd_common_poll(struct file *filp, poll_table *wait)
 {
 	unsigned int minor = iminor(filp->f_path.dentry->d_inode);
-
 	struct circ_buf *circ = &bbd.priv[minor].read_buf;
 	unsigned int mask = 0;
 
@@ -481,11 +457,11 @@ static unsigned int bbd_common_poll(struct file *filp, poll_table *wait)
 
 
 
-
-
-
-
-
+//--------------------------------------------------------------
+//
+//               BBD Device Specific File Functions
+//
+//--------------------------------------------------------------
 
 /**
  * bbd_sensor_write - BBD's RPC calls this function to send sensor packet
@@ -522,7 +498,6 @@ ssize_t bbd_control_write(struct file *filp, const char __user *buf,
 						  size_t size, loff_t *ppos)
 {
 	unsigned int minor = iminor(filp->f_path.dentry->d_inode);
-
 
 	/* get command string first */
 	ssize_t len = bbd_common_write(filp, buf, size, ppos);
@@ -564,11 +539,11 @@ ssize_t bbd_patch_read(struct file *filp, char __user *buf,
 	return rd_size;
 }
 
-
-
-
-
-
+//--------------------------------------------------------------
+//
+//               Sysfs
+//
+//--------------------------------------------------------------
 static ssize_t store_sysfs_bbd_control(struct device *dev,
 									   struct device_attribute *attr,
 									   const char *buf, size_t len)
@@ -598,11 +573,11 @@ static const struct attribute_group bbd_group = {
 };
 
 
-
-
-
-
-
+//--------------------------------------------------------------
+//
+//               Misc Functions
+//
+//--------------------------------------------------------------
 void bbd_log_hex(const char *pIntroduction,
 		const unsigned char *pData,
 		unsigned long        ulDataLen)
@@ -697,14 +672,14 @@ ssize_t bbd_request_mcu(bool on)
 }
 EXPORT_SYMBOL(bbd_request_mcu);
 
-
-
-
-
-
+//--------------------------------------------------------------
+//
+//               PM operation
+//
+//--------------------------------------------------------------
 static int bbd_suspend(pm_message_t state)
 {
-	pr_info("[SSPBBD]: %s ++ \n", __func__);
+	pr_info("[SSPBBD]: %s ++\n", __func__);
 
 #ifdef CONFIG_SENSORS_SSP
 	/* Call SSP suspend */
@@ -713,7 +688,7 @@ static int bbd_suspend(pm_message_t state)
 #endif
 	mdelay(20);
 
-	pr_info("[SSPBBD]: %s -- \n", __func__);
+	pr_info("[SSPBBD]: %s --\n", __func__);
 	return 0;
 }
 
@@ -750,11 +725,11 @@ static struct notifier_block bbd_notifier_block = {
 				.notifier_call = bbd_notifier,
 };
 
-
-
-
-
-
+//--------------------------------------------------------------
+//
+//               BBD Device Init and Exit
+//
+//--------------------------------------------------------------
 
 
 static const struct file_operations bbd_fops[BBD_DEVICE_INDEX] = {
@@ -789,16 +764,6 @@ static const struct file_operations bbd_fops[BBD_DEVICE_INDEX] = {
 		.write		=  NULL, /* /dev/bbd_patch is read-only */
 		.poll		=  NULL,
 	},
-	/* bbd ssi spi debug operations
-	{
-		.owner          =  THIS_MODULE,
-		.open		=  bbd_common_open,
-		.release	=  bbd_common_release,
-		.read           =  NULL,
-		.write          =  bbd_ssi_spi_debug_write,
-		.poll           =  NULL,
-	}
-	*/
 };
 
 
@@ -850,7 +815,8 @@ int bbd_init(struct device *dev, bool legacy_patch)
 		}
 
 		/* Register cdev which relates above device
-		 * number with this BBD device */
+		 * number with this BBD device
+		 */
 		cdev_init(cdev, &bbd_fops[minor]);
 		cdev->owner = THIS_MODULE;
 		cdev->ops = &bbd_fops[minor];
@@ -871,7 +837,6 @@ int bbd_init(struct device *dev, bool legacy_patch)
 			cdev_del(&bbd.priv[minor].dev);
 			goto free_class;
 		}
-
 	}
 
 	/* Register sysfs entry */
@@ -946,7 +911,6 @@ static void __exit bbd_exit(void)
 		device_destroy(bbd.class, devno);
 		cdev_del(cdev);
 		unregister_chrdev_region(devno, 1);
-
 	}
 
 	/* Remove class */
@@ -957,5 +921,3 @@ static void __exit bbd_exit(void)
 
 MODULE_AUTHOR("Broadcom");
 MODULE_LICENSE("Dual BSD/GPL");
-
-
