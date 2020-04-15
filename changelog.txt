@@ -1,8 +1,5 @@
 Changelog:
-- Some power / supply & input changes
-- thermal / core : Workaround for Xiaomi thermal mitigation & fixes
-- Introduce cpu_input_boost
-- Added westwood as default tcp
-- Migrate to novatek 9.1.24 beta firmware
-- Added Performace Profile in FKM
-- Improve Charging rate (Thx @Dhruvgera)
+- Upstream to latest linux tag v4.9.219
+- Some misc fixes
+- Drop FKM performance profile
+- Nuke Adreno idler & state notifier driver

@@ -27,7 +27,6 @@ Release Date | August 2018
 - Simple Low Memory Killer
 - Exposure Adjustment
 - Drivedroid Support
-- State Notifier Driver & Adreno idler
 - Improve Charging rate (Thx @Dhruvgera)
 - Check commit on git for more details
 
