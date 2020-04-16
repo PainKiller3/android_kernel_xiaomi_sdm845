@@ -1170,7 +1170,6 @@ static void nvt_ts_work_func(void)
 	}
 #endif
 
-XFER_ERROR:
 	input_sync(ts->input_dev);
 
 out:
@@ -1502,17 +1501,6 @@ static ssize_t nvt_panel_display_show(struct device *dev,
 	return scnprintf(buf, PAGE_SIZE, "%c\n", ts->lockdown_info[1]);
 }
 
-static DEVICE_ATTR(panel_vendor, (0444), nvt_panel_vendor_show, NULL);
-static DEVICE_ATTR(panel_color, (0444), nvt_panel_color_show, NULL);
-static DEVICE_ATTR(panel_display, (0444), nvt_panel_display_show, NULL);
-
-static struct attribute *nvt_attr_group[] = {
-	&dev_attr_panel_vendor.attr,
-	&dev_attr_panel_color.attr,
-	&dev_attr_panel_display.attr,
-	NULL,
-};
-
 static ssize_t nvt_panel_gesture_enable_show(struct device *dev,
 				     struct device_attribute *attr, char *buf)
 {
@@ -1533,15 +1521,6 @@ static ssize_t nvt_panel_gesture_enable_store(struct device *dev,
 		return -EINVAL;
 	}
 }
-
-
-static DEVICE_ATTR(gesture_enable, S_IWUSR | S_IRUSR,
-		nvt_panel_gesture_enable_show, nvt_panel_gesture_enable_store);
-
-static struct attribute *nvt_attr_group[] = {
-    &dev_attr_gesture_enable.attr,
-	NULL,
-};
 
 static ssize_t novatek_input_symlink(struct nvt_ts_data *ts) {
 	char *driver_path;
@@ -1569,6 +1548,20 @@ static ssize_t novatek_input_symlink(struct nvt_ts_data *ts) {
 	kfree(driver_path);
 	return ret;
 }
+
+static DEVICE_ATTR(panel_vendor, (0444), nvt_panel_vendor_show, NULL);
+static DEVICE_ATTR(panel_color, (0444), nvt_panel_color_show, NULL);
+static DEVICE_ATTR(panel_display, (0444), nvt_panel_display_show, NULL);
+static DEVICE_ATTR(gesture_enable, S_IWUSR | S_IRUSR,
+		nvt_panel_gesture_enable_show, nvt_panel_gesture_enable_store);
+
+static struct attribute *nvt_attr_group[] = {
+	&dev_attr_panel_vendor.attr,
+	&dev_attr_panel_color.attr,
+	&dev_attr_panel_display.attr,
+	&dev_attr_gesture_enable.attr,
+	NULL,
+};
 
 /*******************************************************
 Description:
