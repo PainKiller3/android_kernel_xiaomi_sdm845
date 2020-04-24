@@ -1,5 +1,2 @@
 Changelog:
-- Upstream to latest linux tag v4.9.219
-- Some misc fixes
-- Drop FKM performance profile
-- Nuke Adreno idler & state notifier driver
+- Upstream to latest linux tag v4.9.220
