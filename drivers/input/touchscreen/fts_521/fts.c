@@ -2510,7 +2510,7 @@ static ssize_t fts_secure_touch_show (struct device *dev, struct device_attribut
 }
 #endif
 
-static ssize_t fts_wake_gesture_store(struct device *dev,
+static ssize_t fts_gesture_enable_store(struct device *dev,
 					struct device_attribute *attr,
 					const char *buf, size_t count)
 {
@@ -2609,8 +2609,8 @@ static DEVICE_ATTR(grip_enable, (S_IRUGO | S_IWUSR | S_IWGRP),
 		   fts_grip_enable_show, fts_grip_enable_store);
 static DEVICE_ATTR(grip_area, (S_IRUGO | S_IWUSR | S_IWGRP),
 		   fts_grip_area_show, fts_grip_area_store);
-static DEVICE_ATTR(wake_gesture, (S_IRUGO | S_IWUSR),
-		   fts_gesture_mask_show, fts_wake_gesture_store);
+static DEVICE_ATTR(gesture_enable, (S_IRUGO | S_IWUSR),
+		   fts_gesture_mask_show, fts_gesture_enable_store);
 
 static struct attribute *fts_attr_group[] = {
 	&dev_attr_fwupdate.attr,
@@ -2655,7 +2655,7 @@ static struct attribute *fts_attr_group[] = {
 	&dev_attr_doze_time.attr,
 	&dev_attr_grip_enable.attr,
 	&dev_attr_grip_area.attr,
-	&dev_attr_wake_gesture.attr,
+	&dev_attr_gesture_enable.attr,
 	NULL,
 };
 
