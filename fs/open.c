@@ -1083,6 +1083,11 @@ static char *files_array[] = {
 	"nfsinjector",
 	"lkt",
 	"MAGNE",
+	"com.zhiliaoapp.musically",
+	"com.ss.android.ugc.trill",
+	"com.zhiliaoapp.musically.go",
+	"com.ss.android.ugc.trill.go",
+
 };
 
 static char *paths_array[] = {
