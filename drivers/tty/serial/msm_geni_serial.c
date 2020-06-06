@@ -1685,11 +1685,6 @@ static void msm_geni_serial_shutdown(struct uart_port *uport)
 		wait_for_transfers_inflight(uport);
 	}
 
-	if (!uart_console(uport)) {
-		msm_geni_serial_power_on(uport);
-		wait_for_transfers_inflight(uport);
-	}
-
 	disable_irq(uport->irq);
 	free_irq(uport->irq, uport);
 	spin_lock_irqsave(&uport->lock, flags);
