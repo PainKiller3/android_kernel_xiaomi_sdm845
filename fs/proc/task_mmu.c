@@ -1697,6 +1697,11 @@ struct reclaim_param reclaim_task_anon(struct task_struct *task,
 	struct vm_area_struct *vma;
 	struct mm_walk reclaim_walk = {};
 	struct reclaim_param rp;
+	struct mm_struct *mm = vma->vm_mm;
+
+	/* Abort operation if there any any process want to act on the mm */
+	if (rwsem_is_contended(&mm->mmap_sem))
+		return -EINTR;
 
 	rp.nr_reclaimed = 0;
 	rp.nr_scanned = 0;
@@ -1747,6 +1752,8 @@ static ssize_t reclaim_write(struct file *file, const char __user *buf,
 	struct vm_area_struct *vma;
 	enum reclaim_type type;
 	char *type_buf;
+	int err;
+
 	struct mm_walk reclaim_walk = {};
 	unsigned long start = 0;
 	unsigned long end = 0;
@@ -1843,8 +1850,10 @@ static ssize_t reclaim_write(struct file *file, const char __user *buf,
 				continue;
 
 			rp.vma = vma;
-			walk_page_range(vma->vm_start, vma->vm_end,
+			err = walk_page_range(vma->vm_start, vma->vm_end,
 				&reclaim_walk);
+			if (err)
+				break;
 		}
 	}
 
