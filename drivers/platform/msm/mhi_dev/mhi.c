@@ -1714,7 +1714,15 @@ static void mhi_update_state_info_all(enum mhi_ctrl_info info)
 	struct mhi_dev_client_cb_reason reason;
 
 	mhi_ctx->ctrl_info = info;
-	for (i = 0; i < MHI_MAX_CHANNELS; ++i) {
+	for (i = 0; i < MHI_MAX_SOFTWARE_CHANNELS; ++i) {
+		/*
+		 * Skip channel state info change
+		 * if channel is already in the desired state.
+		 */
+		if (channel_state_info[i].ctrl_info == info ||
+		    (info == MHI_STATE_DISCONNECTED &&
+		    channel_state_info[i].ctrl_info == MHI_STATE_CONFIGURED))
+			continue;
 		channel_state_info[i].ctrl_info = info;
 		/* Notify kernel clients */
 		mhi_dev_trigger_cb(i);
