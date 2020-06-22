@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1974,6 +1974,7 @@ free_ereqs:
 	ch->ereqs = NULL;
 free_client:
 	kfree(*handle_client);
+	*handle_client = NULL;
 exit:
 	mutex_unlock(&ch->ch_lock);
 	return rc;
@@ -1984,6 +1985,11 @@ int mhi_dev_channel_isempty(struct mhi_dev_client *handle)
 {
 	struct mhi_dev_channel *ch;
 	int rc;
+
+	if (!handle) {
+		mhi_log(MHI_MSG_ERROR, "Invalid channel access\n");
+		return -EINVAL;
+	}
 
 	ch = handle->channel;
 	if (!ch)
