@@ -507,7 +507,6 @@ SYSCALL_DEFINE5(mremap, unsigned long, addr, unsigned long, old_len,
 	unsigned long ret = -EINVAL;
 	unsigned long charged = 0;
 	bool locked = false;
-	bool downgraded = false;
 
 	if (flags & ~(MREMAP_FIXED | MREMAP_MAYMOVE))
 		return ret;
@@ -541,19 +540,12 @@ SYSCALL_DEFINE5(mremap, unsigned long, addr, unsigned long, old_len,
 	/*
 	 * Always allow a shrinking remap: that just unmaps
 	 * the unnecessary pages..
-	 * __do_munmap does all the needed commit accounting, and
-	 * downgrades mmap_sem to read if so directed.
+	 * do_munmap does all the needed commit accounting
 	 */
 	if (old_len >= new_len) {
-		int retval;
-
-		retval = __do_munmap(mm, addr+new_len, old_len - new_len, true);
-		if (retval < 0 && old_len != new_len) {
-			ret = retval;
+		ret = do_munmap(mm, addr+new_len, old_len - new_len);
+		if (ret && old_len != new_len)
 			goto out;
-		/* Returning 1 indicates mmap_sem is downgraded to read. */
-		} else if (retval == 1)
-			downgraded = true;
 		ret = addr;
 		goto out;
 	}
@@ -617,10 +609,7 @@ out:
 		vm_unacct_memory(charged);
 		locked = 0;
 	}
-	if (downgraded)
-		up_read(&current->mm->mmap_sem);
-	else
-		up_write(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	if (locked && new_len > old_len)
 		mm_populate(new_addr + old_len, new_len - old_len);
 	return ret;
