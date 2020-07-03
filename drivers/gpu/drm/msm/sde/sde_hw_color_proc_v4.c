@@ -18,13 +18,13 @@
 #ifdef CONFIG_KLAPSE
 #include <linux/klapse.h>
 
-unsigned short kcal_red = 256;
-unsigned short kcal_green = 256;
-unsigned short kcal_blue = 256;
+unsigned short kcal_red = 231;
+unsigned short kcal_green = 231;
+unsigned short kcal_blue = 231;
 #else
-static unsigned short kcal_red = 256;
-static unsigned short kcal_green = 256;
-static unsigned short kcal_blue = 256;
+static unsigned short kcal_red = 231;
+static unsigned short kcal_green = 231;
+static unsigned short kcal_blue = 231;
 #endif
 static unsigned short kcal_hue = 0;
 static unsigned short kcal_sat = 255;
@@ -266,13 +266,13 @@ void sde_setup_dspp_pccv4(struct sde_hw_dspp *ctx, void *cfg)
 
 		// RED
 		SDE_REG_WRITE(&ctx->hw, base + PCC_R_OFF,
-			i == 0 ? (coeffs->r * kcal_red) / 256 : coeffs->r);
+			i == 0 ? (coeffs->r * kcal_red) / 231 : coeffs->r);
 		// GREEN
 		SDE_REG_WRITE(&ctx->hw, base + PCC_G_OFF,
-			i == 1 ? (coeffs->g * kcal_green) / 256 : coeffs->g);
+			i == 1 ? (coeffs->g * kcal_green) / 231 : coeffs->g);
 		// BLUE
 		SDE_REG_WRITE(&ctx->hw, base + PCC_B_OFF,
-			i == 2 ? (coeffs->b * kcal_blue) / 256 : coeffs->b);
+			i == 2 ? (coeffs->b * kcal_blue) / 231 : coeffs->b);
 
 		SDE_REG_WRITE(&ctx->hw, base + PCC_RG_OFF, coeffs->rg);
 		SDE_REG_WRITE(&ctx->hw, base + PCC_RB_OFF, coeffs->rb);
