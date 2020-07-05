@@ -18,17 +18,18 @@ Release Date | August 2018
 
 ## Features
 - Always updates with latest caf & linux tag
-- Compiled using Clang 11.0.0
+- Compiled Using Proton Clang
 - Sound Control
-- Zen & Maple Iosched
+- Maple Iosched
 - Boeffla WL Blocker
-- BLU_SCHEDUTIL Governor
 - File Blocker
 - Simple Low Memory Killer
-- Exposure Adjustment
 - Drivedroid Support
-- Improve Charging rate (Thx @Dhruvgera)
+- Proper Fast Charging Support
 - Check commit on git for more details
+
+## Downloads
+- [SilverCore Kernel For Beryllium](https://bit.ly/3elaLrR)
 
 ## Telegram Channel
 - [Telegram Channel](https://t.me/reignzupdate)
