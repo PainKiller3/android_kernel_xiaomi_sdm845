@@ -67,20 +67,6 @@ perseus-p2-v2.1-overlay.dtbo-base := sdm845-v2.1.dtb
 perseus-p3-v2.1-overlay.dtbo-base := sdm845-v2.1.dtb
 perseus-mp-v2.1-overlay.dtbo-base := sdm845-v2.1.dtb
 else
-dtb-y += \
-	sdm845-sim.dtb \
-	sdm845-rumi.dtb \
-	sdm845-mtp.dtb \
-	sdm845-cdp.dtb \
-	sdm845-v2-rumi.dtb \
-	sdm845-v2-mtp.dtb \
-	sdm845-v2-cdp.dtb \
-	sdm845-qrd.dtb \
-	sdm845-v2-qrd.dtb \
-	sdm845-4k-panel-mtp.dtb \
-	sdm845-4k-panel-cdp.dtb \
-	sdm845-4k-panel-qrd.dtb
-
 dtb-$(CONFIG_MACH_XIAOMI_D5X) += \
 	polaris-p0.dtb \
 	polaris-p0-v2.dtb \
@@ -112,10 +98,6 @@ dtb-$(CONFIG_MACH_XIAOMI_E1N) += \
 	dipper-mp-v2.1.dtb
 
 dtb-$(CONFIG_MACH_XIAOMI_E10) += \
-	beryllium-p0-v2.dtb \
-	beryllium-p0-v2.1.dtb \
-	beryllium-p1-v2.1.dtb \
-	beryllium-p2-v2.1.dtb \
 	beryllium-mp-v2.1.dtb
 
 dtb-$(CONFIG_MACH_XIAOMI_E1S) += \
