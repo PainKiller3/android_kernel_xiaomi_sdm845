@@ -279,6 +279,7 @@ static int limits_dcvs_write(uint32_t node_id, uint32_t fn,
 	return ret;
 }
 
+static int curr_limit = LIMITS_TEMP_DEFAULT;
 static int lmh_get_temp(void *data, int *val)
 {
 	/*
@@ -296,12 +297,20 @@ static int lmh_set_trips(void *data, int low, int high)
 	struct limits_dcvs_hw *hw = (struct limits_dcvs_hw *)data;
 	int ret = 0;
 
-	if (high >= LIMITS_TEMP_HIGH_THRESH_MAX || low < 0) {
+	pr_err("lmh_set_trips: 1 low:%d high:%d\n",low, high);
+
+    if( low == -2147483648 ) low = high-30000;
+    if( high == 2147483647 ) high = low+30000;
+
+	pr_err("lmh_set_trips: 2 low:%d high:%d\n",low, high);
+
+	if (high >= LIMITS_TEMP_HIGH_THRESH_MAX || low < -(LIMITS_TEMP_HIGH_THRESH_MAX)) {
 		pr_err("Value out of range low:%d high:%d\n",
 				low, high);
 		return -EINVAL;
 	}
 
+    curr_limit = high;
 	/* Sanity check limits before writing to the hardware */
 	if (low >= high)
 		return -EINVAL;
