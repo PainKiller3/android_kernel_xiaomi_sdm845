@@ -26,7 +26,6 @@
 #include <linux/hrtimer.h>
 #include <linux/ktime.h>
 #include <linux/tick.h>
-#include <linux/wakeup_reason.h>
 #include <linux/suspend.h>
 #include <linux/pm_qos.h>
 #include <linux/of_platform.h>
@@ -1378,7 +1377,7 @@ static void lpm_cpuidle_freeze(struct cpuidle_device *dev,
 {
 	static DEFINE_SPINLOCK(s2idle_lock);
 	static struct cpumask idling_cpus;
-	static s2idle_sleep_attempts;
+	static int s2idle_sleep_attempts;
 	static bool s2idle_aborted;
 	struct lpm_cpu *cpu = per_cpu(cpu_lpm, dev->cpu);
 	const struct cpumask *cpumask = get_cpu_mask(dev->cpu);
@@ -1410,7 +1409,6 @@ static void lpm_cpuidle_freeze(struct cpuidle_device *dev,
 
 	if (s2idle_aborted) {
 		pr_err("Aborting s2idle suspend: too many iterations\n");
-		log_bad_wake_reason("s2idle soft watchdog");
 		pm_system_wakeup();
 		goto exit;
 	}
