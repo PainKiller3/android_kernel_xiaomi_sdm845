@@ -1979,7 +1979,17 @@ checkbme:
 	EP_PCIE_DBG(dev, "PCIe V%d: PCIE20_CAP_LINKCTRLSTATUS: 0x%x\n",
 		dev->rev,
 		readl_relaxed(dev->dm_core + PCIE20_CAP_LINKCTRLSTATUS));
-
+	/*
+	 * Hold a wakelock since the mhi wakelock will be released while
+	 * processing M3, and we might miss the L1ss inactivity timer
+	 * interrupt  (used for D3hot sleep feature) if apps goes into suspend.
+	 */
+	if (!atomic_read(&dev->ep_pcie_dev_wake)) {
+		pm_stay_awake(&dev->pdev->dev);
+		atomic_set(&dev->ep_pcie_dev_wake, 1);
+		EP_PCIE_DBG(dev, "PCIe V%d: Acquired wakelock\n",
+			dev->rev);
+	}
 	dev->suspending = false;
 	goto out;
 
@@ -2301,17 +2311,6 @@ static irqreturn_t ep_pcie_handle_dstate_change_irq(int irq, void *data)
 				"PCIe V%d: do not notify client about this D3 hot event since enumeration by HLOS is not done yet.\n",
 				dev->rev);
 		ep_pcie_core_log_l1_debug_regs(dev);
-		/*
-		 * Hold a wakelock since the mhi wakelock will be released while
-		 * processing M3, and we might miss the L1ss inactivity timer
-		 * interrupt if apps goes into suspend.
-		 */
-		if (!atomic_read(&dev->ep_pcie_dev_wake)) {
-			pm_stay_awake(&dev->pdev->dev);
-			atomic_set(&dev->ep_pcie_dev_wake, 1);
-			EP_PCIE_DBG(dev, "PCIe V%d: Acquired wakelock\n",
-				dev->rev);
-		}
 		queue_work(dev->d3hot_sleep_wq, &dev->sched_inact_timer);
 	} else if (dstate == 0) {
 		dev->l23_ready = false;
