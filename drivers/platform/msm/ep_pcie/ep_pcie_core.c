@@ -439,6 +439,10 @@ static int ep_pcie_clk_init(struct ep_pcie_dev_t *dev)
 		dev->gdsc_disabled = true;
 	}
 
+	dev->clk_ref_count++;
+	EP_PCIE_DBG(dev, "PCIe V%d, Clock ref count %d\n",
+		dev->rev, dev->clk_ref_count);
+
 	return rc;
 }
 
@@ -450,7 +454,10 @@ static void ep_pcie_clk_deinit(struct ep_pcie_dev_t *dev)
 	EP_PCIE_DBG(dev, "PCIe V%d, Clock ref count %d\n",
 		dev->rev, dev->clk_ref_count);
 
-	if (!dev->in_d3hot_sleep) {
+	if (dev->clk_ref_count != 1)
+		dump_stack();
+
+	if (dev->clk_ref_count) {
 		for (i = EP_PCIE_MAX_CLK - 1; i >= 0; i--)
 		if (dev->clk[i].hdl)
 			clk_disable_unprepare(dev->clk[i].hdl);
@@ -467,10 +474,7 @@ static void ep_pcie_clk_deinit(struct ep_pcie_dev_t *dev)
 				"PCIe V%d: relinquish bus bandwidth.\n",
 				dev->rev);
 		}
-	} else {
-		EP_PCIE_DBG(dev,
-			"PCIe V%d, In d3hot sleep, clks already disabled\n",
-			dev->rev);
+		dev->clk_ref_count--;
 	}
 
 	if (!dev->perst_deast) {
@@ -548,7 +552,7 @@ static void ep_pcie_pipe_clk_deinit(struct ep_pcie_dev_t *dev)
 	EP_PCIE_DBG(dev, "PCIe V%d, Clock ref count %d\n",
 		dev->rev, dev->clk_ref_count);
 
-	if (!dev->in_d3hot_sleep) {
+	if (dev->clk_ref_count) {
 
 		if (dev->clk_ref_count != 1)
 			dump_stack();
@@ -557,8 +561,6 @@ static void ep_pcie_pipe_clk_deinit(struct ep_pcie_dev_t *dev)
 		if (dev->pipeclk[i].hdl)
 			clk_disable_unprepare(
 			dev->pipeclk[i].hdl);
-
-		dev->clk_ref_count--;
 	} else {
 		EP_PCIE_DBG(dev,
 			"PCIe V%d, In d3hot sleep, pipe_clk already disabled\n",
