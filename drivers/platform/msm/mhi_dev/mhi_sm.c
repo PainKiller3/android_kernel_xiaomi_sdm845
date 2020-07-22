@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1225,9 +1225,15 @@ void mhi_dev_sm_pcie_handler(struct ep_pcie_notify *notify)
 		break;
 	case EP_PCIE_EVENT_LINKDOWN:
 		mhi_sm_ctx->stats.linkdown_event_cnt++;
-		mhi_sm_ctx->syserr_occurred = true;
-		MHI_SM_ERR("got %s, ERROR occurred\n",
-			mhi_sm_pcie_event_str(event));
+		if (mhi_sm_ctx->d_state == MHI_SM_EP_PCIE_D3_HOT_STATE) {
+			MHI_SM_ERR("Linkdown happened in D3 hot, ignoring\n");
+			kfree(dstate_change_evt);
+			goto exit;
+		} else {
+			mhi_sm_ctx->syserr_occurred = true;
+			MHI_SM_ERR("got %s, ERROR occurred\n",
+				mhi_sm_pcie_event_str(event));
+		}
 		break;
 	case EP_PCIE_EVENT_MHI_A7:
 		ep_pcie_mask_irq_event(mhi_sm_ctx->mhi_dev->phandle,
