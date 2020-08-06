@@ -19,5 +19,5 @@
 #define LIST_WL_DEFAULT				"7000000.ssusb;c440000.qcom;qcom_rx_wakelock;wlan;wlan_wow_wl;wlan_extscan_wl;netmgr_wl;NETLINK;898000.qcom,qup_uart;IPA_WS;wlan_ipa;wlan_pno_wl;wcnss_filter_lock;hal_bluetooth_lock;c440000.qcom,spmi:qcom,pmi8998@2:qcom,qpnp-smb2;IPA_RM12"
 
 #define LENGTH_LIST_WL				255
-#define LENGTH_LIST_WL_DEFAULT		224
+#define LENGTH_LIST_WL_DEFAULT		238
 #define LENGTH_LIST_WL_SEARCH		LENGTH_LIST_WL + LENGTH_LIST_WL_DEFAULT + 5
