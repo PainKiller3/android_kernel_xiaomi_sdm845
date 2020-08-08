@@ -22,6 +22,8 @@
 #include <linux/i2c.h>
 #include <linux/input.h>
 
+#include <linux/pm_qos.h>
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
@@ -156,6 +158,7 @@ struct nvt_ts_data {
 	struct work_struct suspend_work;
 	struct work_struct resume_work;
 	struct workqueue_struct *event_wq;
+    struct pm_qos_request pm_qos_req;
 	struct completion dev_pm_suspend_completion;
 	struct proc_dir_entry *input_proc;
 };
