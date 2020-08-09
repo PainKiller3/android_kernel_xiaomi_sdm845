@@ -1162,7 +1162,7 @@ static void nvt_ts_work_func(struct work_struct *work)
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
 
 #if WAKEUP_GESTURE
-	if (bTouchIsAwake == 0) {
+	if (unlikely(bTouchIsAwake == 0)) {
 		input_id = (uint8_t)(point_data[1] >> 3);
 		nvt_ts_wakeup_gesture_report(input_id, point_data);
 		//enable_irq(ts->client->irq);
@@ -1257,8 +1257,6 @@ static void nvt_ts_work_func(struct work_struct *work)
 	}
 #endif
 
-    //dev_err(&ts->client->dev, "%s sync\n", __func__);
-
 	input_sync(ts->input_dev);
 
 XFER_ERROR:
@@ -1266,8 +1264,6 @@ XFER_ERROR:
 
 	mutex_unlock(&ts->lock);
     pm_qos_update_request(&ts->pm_qos_req, PM_QOS_DEFAULT_VALUE);
-
-    //dev_err(&ts->client->dev, "%s exit\n", __func__);
 }
 
 /*******************************************************
@@ -1279,12 +1275,15 @@ return:
 *******************************************************/
 static irqreturn_t nvt_ts_irq_handler(int32_t irq, void *dev_id)
 {
-    //dev_err(&ts->client->dev, "%s nvt_ts_irq_handler\n", __func__);
 	//disable_irq_nosync(ts->client->irq);
-	if (bTouchIsAwake == 0) {
-		dev_err(&ts->client->dev, "%s gesture wakeup\n", __func__);
-	}
+
     pm_qos_update_request(&ts->pm_qos_req, 100);
+  	if (unlikely(bTouchIsAwake == 0)) {
+		dev_err(&ts->client->dev, "%s gesture wakeup\n", __func__);
+        pm_wakeup_event(&ts->client->dev,1000);
+	} else {
+        pm_wakeup_event(&ts->client->dev,50);
+    }
 	queue_work(nvt_wq, &ts->nvt_work);
 
 	return IRQ_HANDLED;
