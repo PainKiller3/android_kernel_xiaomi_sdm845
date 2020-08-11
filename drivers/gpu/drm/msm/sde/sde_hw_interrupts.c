@@ -810,13 +810,17 @@ static void sde_hw_intr_dispatch_irq(struct sde_hw_intr *intr,
 		return;
 
 	/*
-	 * The dispatcher will save the IRQ status before calling here.
 	 * Now need to go through each IRQ status and find matching
 	 * irq lookup index.
 	 */
 	spin_lock_irqsave(&intr->irq_lock, irq_flags);
 	for (reg_idx = 0; reg_idx < ARRAY_SIZE(sde_intr_set); reg_idx++) {
-		irq_status = intr->save_irq_status[reg_idx];
+		/* Read interrupt status */
+		irq_status = SDE_REG_READ(&intr->hw,
+				sde_intr_set[reg_idx].status_off);
+
+		if (!irq_status)
+			continue;
 
 		/*
 		 * Each Interrupt register has a range of 32 indexes, and
@@ -837,20 +841,13 @@ static void sde_hw_intr_dispatch_irq(struct sde_hw_intr *intr,
 		for (irq_idx = start_idx;
 				(irq_idx < end_idx) && irq_status;
 				irq_idx++)
-			if ((irq_status & sde_irq_map[irq_idx].irq_mask) &&
-				(sde_irq_map[irq_idx].reg_idx == reg_idx)) {
+			if (irq_status & sde_irq_map[irq_idx].irq_mask) {
 				/*
 				 * Once a match on irq mask, perform a callback
-				 * to the given cbfunc. cbfunc will take care
-				 * the interrupt status clearing. If cbfunc is
-				 * not provided, then the interrupt clearing
-				 * is here.
+				 * to the given cbfunc.
 				 */
 				if (cbfunc)
 					cbfunc(arg, irq_idx);
-				else
-					intr->ops.clear_intr_status_nolock(
-							intr, irq_idx);
 
 				/*
 				 * When callback finish, clear the irq_status
@@ -859,7 +856,15 @@ static void sde_hw_intr_dispatch_irq(struct sde_hw_intr *intr,
 				 */
 				irq_status &= ~sde_irq_map[irq_idx].irq_mask;
 			}
+
+		/* Clear the interrupt */
+		SDE_REG_WRITE(&intr->hw, sde_intr_set[reg_idx].clr_off,
+				0xffffffff);
 	}
+
+	/* ensure register writes go through */
+	wmb();
+
 	spin_unlock_irqrestore(&intr->irq_lock, irq_flags);
 }
 
@@ -1028,39 +1033,6 @@ static int sde_hw_intr_get_interrupt_sources(struct sde_hw_intr *intr,
 	return 0;
 }
 
-static void sde_hw_intr_get_interrupt_statuses(struct sde_hw_intr *intr)
-{
-	int i;
-	u32 enable_mask;
-	unsigned long irq_flags;
-
-	if (!intr)
-		return;
-
-	spin_lock_irqsave(&intr->irq_lock, irq_flags);
-	for (i = 0; i < ARRAY_SIZE(sde_intr_set); i++) {
-		/* Read interrupt status */
-		intr->save_irq_status[i] = SDE_REG_READ(&intr->hw,
-				sde_intr_set[i].status_off);
-
-		/* Read enable mask */
-		enable_mask = SDE_REG_READ(&intr->hw, sde_intr_set[i].en_off);
-
-		/* and clear the interrupt */
-		if (intr->save_irq_status[i])
-			SDE_REG_WRITE(&intr->hw, sde_intr_set[i].clr_off,
-					intr->save_irq_status[i]);
-
-		/* Finally update IRQ status based on enable mask */
-		intr->save_irq_status[i] &= enable_mask;
-	}
-
-	/* ensure register writes go through */
-	wmb();
-
-	spin_unlock_irqrestore(&intr->irq_lock, irq_flags);
-}
-
 static void sde_hw_intr_clear_intr_status_force_mask(struct sde_hw_intr *intr,
 						 int irq_idx, u32 irq_mask)
 {
@@ -1209,7 +1181,6 @@ static void __setup_intr_ops(struct sde_hw_intr_ops *ops)
 	ops->disable_all_irqs = sde_hw_intr_disable_irqs;
 	ops->get_valid_interrupts = sde_hw_intr_get_valid_interrupts;
 	ops->get_interrupt_sources = sde_hw_intr_get_interrupt_sources;
-	ops->get_interrupt_statuses = sde_hw_intr_get_interrupt_statuses;
 	ops->clear_interrupt_status = sde_hw_intr_clear_interrupt_status;
 	ops->clear_intr_status_nolock = sde_hw_intr_clear_intr_status_nolock;
 	ops->clear_intr_status_force_mask =
@@ -1260,14 +1231,6 @@ struct sde_hw_intr *sde_hw_intr_init(void __iomem *addr,
 		return ERR_PTR(-ENOMEM);
 	}
 
-	intr->save_irq_status = kcalloc(ARRAY_SIZE(sde_intr_set), sizeof(u32),
-			GFP_KERNEL);
-	if (intr->save_irq_status == NULL) {
-		kfree(intr->cache_irq_mask);
-		kfree(intr);
-		return ERR_PTR(-ENOMEM);
-	}
-
 	spin_lock_init(&intr->irq_lock);
 
 	return intr;
@@ -1277,7 +1240,6 @@ void sde_hw_intr_destroy(struct sde_hw_intr *intr)
 {
 	if (intr) {
 		kfree(intr->cache_irq_mask);
-		kfree(intr->save_irq_status);
 		kfree(intr);
 	}
 }
