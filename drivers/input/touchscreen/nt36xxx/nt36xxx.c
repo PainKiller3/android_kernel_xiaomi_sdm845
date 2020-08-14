@@ -1165,7 +1165,7 @@ static void nvt_ts_work_func(struct work_struct *work)
 	if (unlikely(bTouchIsAwake == 0)) {
 		input_id = (uint8_t)(point_data[1] >> 3);
 		nvt_ts_wakeup_gesture_report(input_id, point_data);
-		//enable_irq(ts->client->irq);
+		enable_irq(ts->client->irq);
 		mutex_unlock(&ts->lock);
         pm_qos_update_request(&ts->pm_qos_req, PM_QOS_DEFAULT_VALUE);
 		return;
@@ -1260,8 +1260,7 @@ static void nvt_ts_work_func(struct work_struct *work)
 	input_sync(ts->input_dev);
 
 XFER_ERROR:
-	//enable_irq(ts->client->irq);
-
+	enable_irq(ts->client->irq);
 	mutex_unlock(&ts->lock);
     pm_qos_update_request(&ts->pm_qos_req, PM_QOS_DEFAULT_VALUE);
 }
@@ -1275,7 +1274,7 @@ return:
 *******************************************************/
 static irqreturn_t nvt_ts_irq_handler(int32_t irq, void *dev_id)
 {
-	//disable_irq_nosync(ts->client->irq);
+	disable_irq_nosync(ts->client->irq);
 
     pm_qos_update_request(&ts->pm_qos_req, 100);
   	if (unlikely(bTouchIsAwake == 0)) {
