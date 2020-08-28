@@ -491,16 +491,16 @@ static int mhi_sm_change_to_M0(void)
 			}
 		}
 
-		res = mhi_dev_resume(mhi_sm_ctx->mhi_dev);
+		res = ipa_mhi_resume();
 		if (res) {
-			MHI_SM_ERR("Failed resuming mhi core, returned %d",
+			MHI_SM_ERR("Failed resuming ipa_mhi, returned %d",
 				res);
 			goto exit;
 		}
 
-		res = ipa_mhi_resume();
+		res = mhi_dev_resume(mhi_sm_ctx->mhi_dev);
 		if (res) {
-			MHI_SM_ERR("Failed resuming ipa_mhi, returned %d",
+			MHI_SM_ERR("Failed resuming mhi core, returned %d",
 				res);
 			goto exit;
 		}
