@@ -51,7 +51,7 @@ extern int32_t nvt_extra_proc_init(void);
 extern void nvt_extra_proc_deinit(void);
 #endif
 
-#if NVT_TOUCH_MP
+#ifdef CONFIG_TOUCHSCREEN_NT36xxx_MP_CTRLRAM
 extern int32_t nvt_mp_proc_init(void);
 extern void nvt_mp_proc_deinit(void);
 #endif
@@ -1754,7 +1754,7 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 	}
 #endif
 
-#if NVT_TOUCH_MP
+#ifdef CONFIG_TOUCHSCREEN_NT36xxx_MP_CTRLRAM
 	ret = nvt_mp_proc_init();
 	if (ret != 0) {
 		NVT_ERR("nvt mp proc init failed. ret=%d\n", ret);
@@ -1783,7 +1783,7 @@ err_register_drm_notif_failed:
 	if (drm_unregister_client(&ts->notifier))
 		NVT_ERR("Error occurred while unregistering drm_notifier.\n");
 #endif
-#if NVT_TOUCH_MP
+#ifdef CONFIG_TOUCHSCREEN_NT36xxx_MP_CTRLRAM
 nvt_mp_proc_deinit();
 err_mp_proc_init_failed:
 #endif
@@ -1856,7 +1856,7 @@ static int32_t nvt_ts_remove(struct i2c_client *client)
 
 	pm_qos_remove_request(&ts->pm_qos_req);
 
-#if NVT_TOUCH_MP
+#ifdef CONFIG_TOUCHSCREEN_NT36xxx_MP_CTRLRAM
 	nvt_mp_proc_deinit();
 #endif
 #if NVT_TOUCH_EXT_PROC
@@ -1922,7 +1922,7 @@ static void nvt_ts_shutdown(struct i2c_client *client)
 		NVT_ERR("Error occurred while unregistering drm_notifier.\n");
 #endif
 
-#if NVT_TOUCH_MP
+#ifdef CONFIG_TOUCHSCREEN_NT36xxx_MP_CTRLRAM
 	nvt_mp_proc_deinit();
 #endif
 #if NVT_TOUCH_EXT_PROC
