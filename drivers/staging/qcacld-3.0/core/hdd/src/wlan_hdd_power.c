@@ -436,7 +436,7 @@ void hdd_disable_ns_offload(struct hdd_adapter *adapter,
 	status = ucfg_pmo_ns_offload_check(hdd_ctx->psoc, trigger,
 					   adapter->session_id);
 	if (status != QDF_STATUS_SUCCESS) {
-		hdd_err("Flushing of NS offload not required");
+		//hdd_err("Flushing of NS offload not required");
 		goto out;
 	}
 

@@ -2212,7 +2212,7 @@ static int nvt_pm_suspend(struct device *dev)
 {
     if (screen_on) return 0;
 	if (device_may_wakeup(dev) && (ts->gesture_enabled)) {
-		NVT_LOG("enable touch irq wake\n");
+		//NVT_LOG("enable touch irq wake\n");
 		enable_irq_wake(ts->client->irq);
 	}
 	if( !screen_on ) { 
@@ -2226,7 +2226,7 @@ static int nvt_pm_resume(struct device *dev)
 {
     if(!ts->dev_pm_suspend) return 0;
 	if (device_may_wakeup(dev) && (ts->gesture_enabled)) {
-		NVT_LOG("disable touch irq wake\n");
+		//NVT_LOG("disable touch irq wake\n");
 		//disable_irq_wake(ts->client->irq);
 	}
 	ts->dev_pm_suspend = false;

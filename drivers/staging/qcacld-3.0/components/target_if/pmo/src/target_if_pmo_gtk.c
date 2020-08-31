@@ -138,7 +138,7 @@ int target_if_pmo_gtk_offload_status_event(void *scn_handle,
 
 	if (wmi_extract_gtk_rsp_event(wmi_handle, event, gtk_rsp_param, len) !=
 				      QDF_STATUS_SUCCESS) {
-		target_if_err("Extraction of gtk rsp event failed");
+		//target_if_err("Extraction of gtk rsp event failed");
 		qdf_mem_free(gtk_rsp_param);
 		ret = -EINVAL;
 		goto out;

@@ -1691,7 +1691,7 @@ static QDF_STATUS send_wow_enable_cmd_tlv(wmi_unified_t wmi_handle,
 		cmd->pause_iface_config = WOW_IFACE_PAUSE_DISABLED;
 	cmd->flags = param->flags;
 
-	WMI_LOGI("suspend type: %s",
+	WMI_LOGD("suspend type: %s",
 		cmd->pause_iface_config == WOW_IFACE_PAUSE_ENABLED ?
 		"WOW_IFACE_PAUSE_ENABLED" : "WOW_IFACE_PAUSE_DISABLED");
 
@@ -14669,7 +14669,7 @@ static QDF_STATUS extract_gtk_rsp_event_tlv(wmi_unified_t wmi_handle,
 	}
 
 	if (len < sizeof(WMI_GTK_OFFLOAD_STATUS_EVENT_fixed_param)) {
-		WMI_LOGE("Invalid length for GTK status");
+		WMI_LOGD("Invalid length for GTK status");
 		return QDF_STATUS_E_INVAL;
 	}
 
