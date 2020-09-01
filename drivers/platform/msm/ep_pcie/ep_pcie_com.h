@@ -416,7 +416,6 @@ struct ep_pcie_dev_t {
 	bool                         config_mmio_init;
 	bool                         enumerated;
 	enum ep_pcie_link_status     link_status;
-	bool                         perst_deast;
 	bool                         power_on;
 	bool                         suspending;
 	bool                         l23_ready;
@@ -424,12 +423,13 @@ struct ep_pcie_dev_t {
 	struct ep_pcie_msi_config    msi_cfg;
 	bool                         no_notify;
 	bool                         client_ready;
+	atomic_t		     ep_pcie_dev_wake;
+	atomic_t                     perst_deast;
 
 	struct ep_pcie_register_event *event_reg;
 	struct work_struct	     handle_perst_work;
 	struct work_struct           handle_bme_work;
 	struct work_struct           handle_d3cold_work;
-	atomic_t		     ep_pcie_dev_wake;
 	struct work_struct           handle_d3hot_sleep_work;
 	struct work_struct	     sched_inact_timer;
 	struct workqueue_struct	     *d3hot_sleep_wq;
