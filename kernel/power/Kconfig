@@ -352,4 +352,4 @@ config CPU_PM
 
 config DEDUCE_WAKEUP_REASONS
 	bool
-	default n
+	default y
