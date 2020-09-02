@@ -357,4 +357,4 @@ config	BOEFFLA_WL_BLOCKER
 
 config DEDUCE_WAKEUP_REASONS
 	bool
-	default n
+	default y
