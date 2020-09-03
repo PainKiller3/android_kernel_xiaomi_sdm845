@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -609,6 +609,7 @@ struct diagchar_dev {
 	unsigned int poolsize_dci;
 	unsigned int poolsize_user;
 	spinlock_t diagmem_lock;
+	wait_queue_head_t hdlc_wait_q;
 	/* Buffers for masks */
 	struct mutex diag_cntl_mutex;
 	/* Members for Sending response */
@@ -710,6 +711,17 @@ extern struct diagchar_dev *driver;
 
 extern int wrap_enabled;
 extern uint16_t wrap_count;
+
+struct diag_apps_data_t {
+	void *buf;
+	uint32_t len;
+	int ctxt;
+	uint8_t allocated;
+	uint8_t flushed;
+};
+
+extern struct diag_apps_data_t hdlc_data;
+extern struct diag_apps_data_t non_hdlc_data;
 
 void diag_get_timestamp(char *time_str);
 void check_drain_timer(void);
