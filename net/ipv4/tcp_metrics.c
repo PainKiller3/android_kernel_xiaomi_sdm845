@@ -20,7 +20,7 @@
 #include <net/tcp.h>
 #include <net/genetlink.h>
 
-int sysctl_tcp_nometrics_save __read_mostly;
+int sysctl_tcp_nometrics_save __read_mostly = 1;
 
 static struct tcp_metrics_block *__tcp_get_metrics(const struct inetpeer_addr *saddr,
 						   const struct inetpeer_addr *daddr,

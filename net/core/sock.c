@@ -271,14 +271,15 @@ static struct lock_class_key af_callback_keys[AF_MAX];
 #define _SK_MEM_OVERHEAD	SKB_TRUESIZE(256)
 #define SK_WMEM_MAX		(_SK_MEM_OVERHEAD * _SK_MEM_PACKETS)
 #define SK_RMEM_MAX		(_SK_MEM_OVERHEAD * _SK_MEM_PACKETS)
+#define TMEM_MAX 261120
 
 /* Run time adjustable parameters. */
-__u32 sysctl_wmem_max __read_mostly = SK_WMEM_MAX;
+__u32 sysctl_wmem_max __read_mostly = TMEM_MAX;
 EXPORT_SYMBOL(sysctl_wmem_max);
-__u32 sysctl_rmem_max __read_mostly = SK_RMEM_MAX;
+__u32 sysctl_rmem_max __read_mostly = TMEM_MAX;
 EXPORT_SYMBOL(sysctl_rmem_max);
-__u32 sysctl_wmem_default __read_mostly = SK_WMEM_MAX;
-__u32 sysctl_rmem_default __read_mostly = SK_RMEM_MAX;
+__u32 sysctl_wmem_default __read_mostly = TMEM_MAX;
+__u32 sysctl_rmem_default __read_mostly = TMEM_MAX;
 
 /* Maximal space eaten by iovec or ancillary data plus some space */
 int sysctl_optmem_max __read_mostly = sizeof(unsigned long)*(2*UIO_MAXIOV+512);

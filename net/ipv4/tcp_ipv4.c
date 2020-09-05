@@ -2455,6 +2455,11 @@ static void __net_exit tcp_sk_exit(struct net *net)
 	free_percpu(net->ipv4.tcp_sk);
 }
 
+#define NET_KEEPALIVE_TIME 1800
+#define NET_KEEPALIVE_PROBES 5
+#define NET_KEEPALIVE_INTVL 30
+#define NET_FIN_TIMEOUT 30
+
 static int __net_init tcp_sk_init(struct net *net)
 {
 	int res, cpu;
@@ -2488,18 +2493,18 @@ static int __net_init tcp_sk_init(struct net *net)
 	net->ipv4.sysctl_tcp_probe_threshold = TCP_PROBE_THRESHOLD;
 	net->ipv4.sysctl_tcp_probe_interval = TCP_PROBE_INTERVAL;
 
-	net->ipv4.sysctl_tcp_keepalive_time = TCP_KEEPALIVE_TIME;
-	net->ipv4.sysctl_tcp_keepalive_probes = TCP_KEEPALIVE_PROBES;
-	net->ipv4.sysctl_tcp_keepalive_intvl = TCP_KEEPALIVE_INTVL;
+	net->ipv4.sysctl_tcp_keepalive_time = NET_KEEPALIVE_TIME;
+	net->ipv4.sysctl_tcp_keepalive_probes = NET_KEEPALIVE_PROBES;
+	net->ipv4.sysctl_tcp_keepalive_intvl = NET_KEEPALIVE_INTVL;
 
-	net->ipv4.sysctl_tcp_syn_retries = TCP_SYN_RETRIES;
-	net->ipv4.sysctl_tcp_synack_retries = TCP_SYNACK_RETRIES;
+	net->ipv4.sysctl_tcp_syn_retries = TCP_RETR1;
+	net->ipv4.sysctl_tcp_synack_retries = TCP_RETR1;
 	net->ipv4.sysctl_tcp_syncookies = 0;
 	net->ipv4.sysctl_tcp_reordering = TCP_FASTRETRANS_THRESH;
 	net->ipv4.sysctl_tcp_retries1 = TCP_RETR1;
 	net->ipv4.sysctl_tcp_retries2 = TCP_RETR2;
 	net->ipv4.sysctl_tcp_orphan_retries = 0;
-	net->ipv4.sysctl_tcp_fin_timeout = TCP_FIN_TIMEOUT;
+	net->ipv4.sysctl_tcp_fin_timeout = NET_FIN_TIMEOUT;
 	net->ipv4.sysctl_tcp_notsent_lowat = UINT_MAX;
 	net->ipv4.sysctl_tcp_default_init_rwnd = TCP_INIT_CWND * 2;
 
