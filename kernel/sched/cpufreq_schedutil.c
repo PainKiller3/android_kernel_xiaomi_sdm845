@@ -16,6 +16,7 @@
 #include <linux/slab.h>
 #include <trace/events/power.h>
 #include <linux/sched/sysctl.h>
+#include <linux/battery_saver.h>
 #include "sched.h"
 #include "tune.h"
 
@@ -219,6 +220,9 @@ static void sugov_get_util(unsigned long *util, unsigned long *max, int cpu)
 static void sugov_set_iowait_boost(struct sugov_cpu *sg_cpu, u64 time,
 				   unsigned int flags)
 {
+	if (is_battery_saver_on())
+		return;
+
 	if (flags & SCHED_CPUFREQ_IOWAIT) {
 		sg_cpu->iowait_boost = sg_cpu->iowait_boost_max;
 	} else if (sg_cpu->iowait_boost) {
