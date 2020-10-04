@@ -86,7 +86,6 @@ bool osq_lock(struct optimistic_spin_queue *lock)
 {
 	struct optimistic_spin_node *node = this_cpu_ptr(&osq_node);
 	struct optimistic_spin_node *prev, *next;
-	struct task_struct *task = current;
 	int curr = encode_cpu(smp_processor_id());
 	int old;
 
