@@ -276,10 +276,11 @@ struct mhi_config {
 #define TRB_MAX_DATA_SIZE		8192
 #define MHI_CTRL_STATE			100
 
-/*maximum trasnfer completion events buffer*/
-#define MAX_TR_EVENTS			50
-/*maximum event requests */
-#define MHI_MAX_EVT_REQ			50
+/* maximum transfer completion events buffer */
+#define NUM_TR_EVENTS_DEFAULT			128
+
+/* Set flush threshold to 80% of event buf size */
+#define MHI_CMPL_EVT_FLUSH_THRSHLD(n) ((n * 8) / 10)
 
 /* Possible ring element types */
 union mhi_dev_ring_element_type {
@@ -360,6 +361,7 @@ enum mhi_dev_ch_operation {
 enum mhi_dev_tr_compl_evt_type {
 	SEND_EVENT_BUFFER,
 	SEND_EVENT_RD_OFFSET,
+	SEND_MSI
 };
 
 enum mhi_dev_transfer_type {
@@ -380,11 +382,23 @@ struct mhi_dev_ring {
 
 	enum mhi_dev_ring_type			type;
 	enum mhi_dev_ring_state			state;
-
+	/*
+	 * Lock to prevent race in updating event ring
+	 * which is shared by multiple channels
+	 */
+	struct mutex	event_lock;
 	/* device virtual address location of the cached host ring ctx data */
 	union mhi_dev_ring_element_type		*ring_cache;
 	/* Physical address of the cached ring copy on the device side */
 	dma_addr_t				ring_cache_dma_handle;
+	/* Device VA of read pointer array (used only for event rings) */
+	uint64_t			*evt_rp_cache;
+	/* PA of the read pointer array (used only for event rings) */
+	dma_addr_t				evt_rp_cache_dma_handle;
+	/* Device VA of msi buffer (used only for event rings)  */
+	uint32_t			*msi_buf;
+	/* PA of msi buf (used only for event rings) */
+	dma_addr_t				msi_buf_dma_handle;
 	/* Physical address of the host where we will write/read to/from */
 	struct mhi_addr				ring_shadow;
 	/* Ring type - cmd, event, transfer ring and its rp/wp... */
@@ -417,6 +431,11 @@ struct ring_cache_req {
 
 struct event_req {
 	union mhi_dev_ring_element_type *tr_events;
+	/*
+	 * Start index of the completion event buffer segment
+	 * to be flushed to host
+	 */
+	u32			start;
 	u32			num_events;
 	dma_addr_t		dma;
 	u32			dma_len;
@@ -425,7 +444,10 @@ struct event_req {
 	enum mhi_dev_tr_compl_evt_type event_type;
 	u32			event_ring;
 	void			(*client_cb)(void *req);
+	void			(*rd_offset_cb)(void *req);
+	void			(*msi_cb)(void *req);
 	struct list_head	list;
+	u32			flush_num;
 };
 
 struct mhi_dev_channel {
@@ -442,14 +464,23 @@ struct mhi_dev_channel {
 	struct mutex			ch_lock;
 	/* client which the current inbound/outbound message is for */
 	struct mhi_dev_client		*active_client;
+	/* Pointer to completion event buffer */
+	union mhi_dev_ring_element_type *tr_events;
+	/* Indices for completion event buffer */
+	uint32_t			evt_buf_rp;
+	uint32_t			evt_buf_wp;
+	uint32_t			evt_buf_size;
 	/*
-	 * Pointer to event request structs used to temporarily store
+	 * Pointer to a block of event request structs used to temporarily store
 	 * completion events and meta data before sending them to host
 	 */
 	struct event_req		*ereqs;
-	/* Pointer to completion event buffers */
-	union mhi_dev_ring_element_type *tr_events;
+	/* Linked list head for event request structs */
 	struct list_head		event_req_buffers;
+	uint32_t				evt_req_size;
+	/* Linked list head for event request structs to be flushed */
+	struct list_head		flush_event_req_buffers;
+	/* Pointer to the currently used event request struct */
 	struct event_req		*curr_ereq;
 
 	/* current TRE being processed */
@@ -460,7 +491,9 @@ struct mhi_dev_channel {
 	uint32_t			tre_bytes_left;
 	/* td size being read/written from/to so far */
 	uint32_t			td_size;
-	bool				wr_request_active;
+	uint32_t			pend_wr_count;
+	uint32_t			msi_cnt;
+	uint32_t			flush_req_cnt;
 	bool				skip_td;
 };
 
@@ -532,7 +565,6 @@ struct mhi_dev {
 	u32                             ifc_id;
 	struct ep_pcie_hw               *phandle;
 	struct work_struct		pcie_event;
-	struct ep_pcie_msi_config	msi_cfg;
 
 	atomic_t			write_active;
 	atomic_t			is_suspended;
