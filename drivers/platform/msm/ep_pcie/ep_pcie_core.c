@@ -44,6 +44,7 @@
 #define PCIE_MHI_FWD_COUNT			200
 #define PCIE_L1SUB_AHB_TIMEOUT_MIN		100
 #define PCIE_L1SUB_AHB_TIMEOUT_MAX		120
+#define PCIE_INT_AUX_CLK_CONFIG			1
 /* 1 sec inactivity timer at 19.2 MHz aux clk */
 #define PCIE_EP_TIMER_US	19200000
 
@@ -672,14 +673,14 @@ static void ep_pcie_core_init(struct ep_pcie_dev_t *dev, bool configured)
 		ep_pcie_write_mask(dev->dm_core +
 				PCIE20_LINK_CONTROL2_LINK_STATUS2,
 				0xf, dev->curr_link_speed);
+		EP_PCIE_DBG2(dev, "PCIe V%d: Enable L1.\n", dev->rev);
+		ep_pcie_write_mask(dev->parf + PCIE20_PARF_PM_CTRL,
+						BIT(5), 0);
 	}
 
 	if (dev->active_config) {
 		struct resource *dbi = dev->res[EP_PCIE_RES_DM_CORE].resource;
 		u32 dbi_lo = dbi->start;
-
-		EP_PCIE_DBG2(dev, "PCIe V%d: Enable L1.\n", dev->rev);
-		ep_pcie_write_mask(dev->parf + PCIE20_PARF_PM_CTRL, BIT(5), 0);
 
 		ep_pcie_write_reg(dev->parf + PCIE20_PARF_SLV_ADDR_MSB_CTRL,
 					0, BIT(0));
@@ -859,8 +860,6 @@ static void ep_pcie_core_init(struct ep_pcie_dev_t *dev, bool configured)
 
 	if (dev->active_config) {
 		ep_pcie_write_reg(dev->dm_core, PCIE20_AUX_CLK_FREQ_REG, 0x14);
-		EP_PCIE_DBG2(dev, "PCIe V%d: Enable L1.\n", dev->rev);
-		ep_pcie_write_mask(dev->parf + PCIE20_PARF_PM_CTRL, BIT(5), 0);
 	}
 
 	if (!configured)
@@ -1610,69 +1609,6 @@ disable_clkreq:
 	return rc;
 }
 
-static void ep_pcie_core_enable_l1(struct ep_pcie_dev_t *dev)
-{
-	/*
-	 * Configure and enable L1(ss) here immediately after link up
-	 * check in HLOS during EP PCIE driver probe. The phy sequence
-	 * programmed in PBL is deemed good enough to support L1(ss) for
-	 * SDX24.
-	 * The below register writes to support L1(ss) are the same we
-	 * do when link is initialized by HLOS (as opposed to PBL now) -
-	 * writing them here before L1(ss) is enabled to be consistent.
-	 */
-
-	/* Enable CS for RO(CS) register writes */
-	ep_pcie_write_mask(dev->dm_core + PCIE20_MISC_CONTROL_1, 0,
-		BIT(0));
-	/* Set the Endpoint L0s Acceptable Latency to 1us (max) */
-	ep_pcie_write_reg_field(dev->dm_core,
-		PCIE20_DEVICE_CAPABILITIES,
-		PCIE20_MASK_EP_L0S_ACCPT_LATENCY, 0x7);
-
-	/* Set the Endpoint L1 Acceptable Latency to 2 us (max) */
-	ep_pcie_write_reg_field(dev->dm_core,
-		PCIE20_DEVICE_CAPABILITIES,
-		PCIE20_MASK_EP_L1_ACCPT_LATENCY, 0x7);
-
-	/* Set the L0s Exit Latency to 2us-4us = 0x6 */
-	ep_pcie_write_reg_field(dev->dm_core, PCIE20_LINK_CAPABILITIES,
-		PCIE20_MASK_L1_EXIT_LATENCY, 0x6);
-
-	/* Set the L1 Exit Latency to be 32us-64 us = 0x6 */
-	ep_pcie_write_reg_field(dev->dm_core, PCIE20_LINK_CAPABILITIES,
-		PCIE20_MASK_L0S_EXIT_LATENCY, 0x6);
-
-	/*
-	 * CLK_PM_EN must be set to be able to enable clock power
-	 * management capability in the link capability register
-	 */
-	ep_pcie_write_mask(dev->elbi + PCIE20_ELBI_SYS_CTRL, 0,
-		PCIE20_ELBI_SYS_CTRL_CLK_PM_EN_BIT_MASK);
-
-	EP_PCIE_DBG(dev, "PCIe V%d: PCIE20_ELBI_SYS_CTRL: 0x%x\n",
-		dev->rev, readl_relaxed(dev->elbi + PCIE20_ELBI_SYS_CTRL));
-
-	/* Enable Clock Power Management */
-	ep_pcie_write_reg_field(dev->dm_core, PCIE20_LINK_CAPABILITIES,
-		PCIE20_MASK_CLOCK_POWER_MAN, 0x1);
-
-	EP_PCIE_DBG(dev,
-		"After program: PCIE20_LINK_CAPABILITIES:0x%x\n",
-		readl_relaxed(dev->dm_core + PCIE20_LINK_CAPABILITIES));
-
-	/* Disable CS for RO(CS) register writes */
-	ep_pcie_write_mask(dev->dm_core + PCIE20_MISC_CONTROL_1, BIT(0),
-		0);
-
-	/* Enable L1 by clearing REQ_NOT_ENTR_L1 bit */
-	ep_pcie_write_mask(dev->parf + PCIE20_PARF_PM_CTRL,
-		PCIE20_PARF_PM_CTRL_REQ_NOT_ENTR_L1_BIT_MASK, 0);
-
-	EP_PCIE_DBG(dev, "PCIe V%d: PARF_PM_CTRL: 0x%x\n",
-		dev->rev, readl_relaxed(dev->parf + PCIE20_PARF_PM_CTRL));
-}
-
 int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 {
 	int ret = 0;
@@ -1757,7 +1693,6 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 				EP_PCIE_INFO(dev,
 					"PCIe V%d: link initialized by bootloader for LE PCIe endpoint; skip link training in HLOS.\n",
 					dev->rev);
-				ep_pcie_core_enable_l1(dev);
 				/*
 				 * Read and save the subsystem id set in PBL
 				 * (needed for restore during D3->D0)
@@ -2316,8 +2251,23 @@ static irqreturn_t ep_pcie_handle_dstate_change_irq(int irq, void *data)
 		 * in L1ss to minimize the possibility of traffic on the link
 		 * while the phy sequence is updated.
 		 */
-		if (dev->d3_counter == 1)
+		if (dev->d3_counter == 1) {
+			if (dev->use_aux_clk_xo) {
+				/* Explicitly disabling the use of the internal
+				 * phy FLL for aux clock in L1ss and instead
+				 * relying on XO.
+				 */
+				ep_pcie_write_reg(dev->phy,
+					PCIE20_INT_AUX_CLK_CONFIG1,
+					PCIE_INT_AUX_CLK_CONFIG);
+			}
+
+			EP_PCIE_DBG2(dev, "PCIe V%d: Enable L1.\n", dev->rev);
+			ep_pcie_write_mask(dev->parf + PCIE20_PARF_PM_CTRL,
+						BIT(5), 0);
+
 			ep_pcie_update_phy_seq_in_l1ss(dev);
+		}
 
 		if (dev->enumerated)
 			ep_pcie_notify_event(dev, EP_PCIE_EVENT_PM_D3_HOT);
@@ -3643,6 +3593,12 @@ static int ep_pcie_probe(struct platform_device *pdev)
 		"PCIe V%d: enum by PERST is %s enabled.\n",
 		ep_pcie_dev.rev, ep_pcie_dev.perst_enum ? "" : "not");
 
+	ep_pcie_dev.use_aux_clk_xo =
+		of_property_read_bool((&pdev->dev)->of_node,
+				"qcom,pcie-aux-clk-xo");
+	EP_PCIE_DBG(&ep_pcie_dev,
+		"PCIe V%d: AUX CLK XO %s enabled.\n",
+		ep_pcie_dev.rev, ep_pcie_dev.use_aux_clk_xo ? "" : "not");
 	ep_pcie_dev.rev = 1711211;
 	ep_pcie_dev.pdev = pdev;
 	ep_pcie_dev.m2_autonomous =

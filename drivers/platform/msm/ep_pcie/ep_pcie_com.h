@@ -169,6 +169,7 @@
 #define PCIE20_PHY_PCS_END_OFFSET	0xE60
 
 #define PCIE20_AUX_CLK_FREQ_REG        0xB40
+#define PCIE20_INT_AUX_CLK_CONFIG1     0xC50
 
 #define PERST_TIMEOUT_US_MIN	              1000
 #define PERST_TIMEOUT_US_MAX	              1000
@@ -387,6 +388,7 @@ struct ep_pcie_dev_t {
 	u32                          phy_init_len;
 	struct ep_pcie_phy_info_t    *phy_init;
 	bool                         perst_enum;
+	bool                         use_aux_clk_xo;
 
 	u32                          rev;
 	u32                          phy_rev;
