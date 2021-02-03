@@ -4058,7 +4058,7 @@ static void populate_frame_data(struct vidc_frame_data *data,
 	int extra_idx;
 	struct vb2_buffer *vb;
 	struct vb2_v4l2_buffer *vbuf;
-	struct vidc_tag_data tag_data;
+	struct vidc_tag_data tag_data = {{0}};
 
 	if (!inst || !mbuf || !data) {
 		dprintk(VIDC_ERR, "%s: invalid params %pK %pK %pK\n",
