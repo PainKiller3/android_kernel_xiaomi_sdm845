@@ -27,6 +27,9 @@
 #include <linux/kthread.h>
 #include <linux/sched/rt.h>
 
+// Battery saver
+#include <linux/battery_saver.h>
+
 struct cpu_sync {
 	int cpu;
 	unsigned int input_boost_min;
@@ -199,6 +202,10 @@ static void do_input_boost(struct kthread_work *work)
 	unsigned int i, ret;
 	struct cpu_sync *i_sync_info;
 
+	if (is_battery_saver_on()) {
+		pr_info("Skipping boost as battery saver is on\n");
+		return;
+	}
 	cancel_delayed_work_sync(&input_boost_rem);
 	if (sched_boost_active) {
 		sched_set_boost(0);
