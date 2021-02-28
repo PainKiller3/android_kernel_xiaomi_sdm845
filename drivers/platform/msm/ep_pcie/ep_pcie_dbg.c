@@ -357,7 +357,7 @@ static ssize_t ep_pcie_cmd_debug(struct file *file,
 		ep_pcie_config_outbound_iatu(phandle, entries, 2);
 		break;
 	case 13: /* wake up the host */
-		ep_pcie_wakeup_host(phandle);
+		ep_pcie_wakeup_host(phandle, EP_PCIE_EVENT_PM_D3_HOT);
 		break;
 	case 14: /* Configure routing of doorbells */
 		ep_pcie_config_db_routing(phandle, chdb_cfg, erdb_cfg);
