@@ -363,6 +363,7 @@ enum mhi_dev_ch_operation {
 enum mhi_dev_tr_compl_evt_type {
 	SEND_EVENT_BUFFER,
 	SEND_EVENT_RD_OFFSET,
+	SEND_MSI
 };
 
 enum mhi_dev_transfer_type {
@@ -383,11 +384,23 @@ struct mhi_dev_ring {
 
 	enum mhi_dev_ring_type			type;
 	enum mhi_dev_ring_state			state;
-
+	/*
+	 * Lock to prevent race in updating event ring
+	 * which is shared by multiple channels
+	 */
+	struct mutex	event_lock;
 	/* device virtual address location of the cached host ring ctx data */
 	union mhi_dev_ring_element_type		*ring_cache;
 	/* Physical address of the cached ring copy on the device side */
 	dma_addr_t				ring_cache_dma_handle;
+	/* Device VA of read pointer array (used only for event rings) */
+	uint64_t			*evt_rp_cache;
+	/* PA of the read pointer array (used only for event rings) */
+	dma_addr_t				evt_rp_cache_dma_handle;
+	/* Device VA of msi buffer (used only for event rings)  */
+	uint32_t			*msi_buf;
+	/* PA of msi buf (used only for event rings) */
+	dma_addr_t				msi_buf_dma_handle;
 	/* Physical address of the host where we will write/read to/from */
 	struct mhi_addr				ring_shadow;
 	/* Ring type - cmd, event, transfer ring and its rp/wp... */
@@ -433,7 +446,10 @@ struct event_req {
 	enum mhi_dev_tr_compl_evt_type event_type;
 	u32			event_ring;
 	void			(*client_cb)(void *req);
+	void			(*rd_offset_cb)(void *req);
+	void			(*msi_cb)(void *req);
 	struct list_head	list;
+	u32			flush_num;
 };
 
 struct mhi_dev_channel {
@@ -478,6 +494,8 @@ struct mhi_dev_channel {
 	/* td size being read/written from/to so far */
 	uint32_t			td_size;
 	uint32_t			pend_wr_count;
+	uint32_t			msi_cnt;
+	uint32_t			flush_req_cnt;
 	bool				skip_td;
 };
 
@@ -982,6 +1000,12 @@ int mhi_dev_mmio_get_cmd_db(struct mhi_dev_ring *ring, uint64_t *wr_offset);
  * @value:	Value of the EXEC EVN.
  */
 int mhi_dev_mmio_set_env(struct mhi_dev *dev, uint32_t value);
+
+/**
+ * mhi_dev_mmio_clear_reset() - Clear the reset bit
+ * @dev:	MHI device structure.
+ */
+int mhi_dev_mmio_clear_reset(struct mhi_dev *dev);
 
 /**
  * mhi_dev_mmio_reset() - Reset the MMIO done as part of initialization.

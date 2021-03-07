@@ -194,6 +194,9 @@ struct cam_isp_context {
 		CAM_ISP_CTX_STATE_MONITOR_MAX_ENTRIES];
 	bool                             rdi_only_context;
 	atomic_t                         bubble_sof_count;
+	bool                             irq_delay_detect;
+	uint64_t                         irq_timestamps;
+	uint64_t                         irq_timestamps_th;
 };
 
 /**
