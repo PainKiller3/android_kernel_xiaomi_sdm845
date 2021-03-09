@@ -5,6 +5,7 @@
 #include <asm/kernel-pgtable.h>
 #include <asm/sysreg.h>
 #include <asm/assembler.h>
+#include <asm/mmu.h>
 
 /*
  * User access enabling/disabling macros.
