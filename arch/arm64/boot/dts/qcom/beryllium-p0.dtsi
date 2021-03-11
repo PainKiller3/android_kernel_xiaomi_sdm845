@@ -321,7 +321,8 @@
 	qcom,fcc-hot-temp-delta = <1400000>;
 	qcom,fcc-cool-temp-delta = <1960000>;
 	qcom,auto-recharge-soc;
-        qcom,sw-jeita-enable;
+	qcom,sw-jeita-enable;
+	qcom,dynamic-fv-enable;
 	qcom,thermal-mitigation
 				= <1800000 1600000 1400000 1200000 1000000 1000000 1000000>;
 	qcom,thermal-mitigation-dcp
