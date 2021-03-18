@@ -1111,7 +1111,7 @@ static int set_ep_max_packet_size(const struct f_uac2_opts *uac2_opts,
 	}
 
 	max_size_bw = num_channels(chmask) * ssize *
-		DIV_ROUND_UP(srate, factor / (1 << (ep_desc->bInterval - 1)));
+                ((srate / (factor / (1 << (ep_desc->bInterval - 1)))) + 1);
 
 	/* max_packet_size can vary based on sample rate, no. of channels &
 	 * sample size. If max_packet_size > ep_desc->wMaxPacketSize(i.e 1024),
