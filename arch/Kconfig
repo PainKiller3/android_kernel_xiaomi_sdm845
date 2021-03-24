@@ -523,6 +523,7 @@ config LD_LLD
 endchoice
 
 config LTO
+	depends on LTO_CLANG || LTO_GCC
 	def_bool n
 
 config ARCH_SUPPORTS_LTO_CLANG
