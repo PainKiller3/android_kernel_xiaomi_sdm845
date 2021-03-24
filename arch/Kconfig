@@ -574,6 +574,14 @@ config LTO_CLANG
           5.0 (make CC=clang) and GNU gold from binutils >= 2.27, and have the
           LLVMgold plug-in in LD_LIBRARY_PATH.
 
+config LTO_GCC
+	select LTO
+	bool "Enable Link Time Optimization for GCC"
+	select THIN_ARCHIVES
+	select LD_DEAD_CODE_DATA_ELIMINATION
+	help
+	  This enables GCC Link time optimization.
+
 endchoice
 
 config CFI
