@@ -2037,22 +2037,25 @@ static void uclamp_set(struct kernfs_open_file *of,
 		{"foreground", 	     	"0",  "50",  1, 1},
 		{"background", 	     	"20", "100", 0, 0},
 		{"system-background", 	"0",  "40",  0, 0},
+		{"camera-deaemon",	"50", "100", 1, 1},
 	};
 
-	for (i = 0; i < ARRAY_SIZE(tgts); i++) {
-		struct ucl_param tgt = tgts[i];
+	if (!strcmp(current->comm, "init")) {
+		for (i = 0; i < ARRAY_SIZE(tgts); i++) {
+			struct ucl_param tgt = tgts[i];
 
-		if (!strncmp(cs_name, tgt.name, strlen(tgt.name))) {
-			cpu_uclamp_min_write_wrapper(of, tgt.uclamp_min,
-				nbytes, off);
-			cpu_uclamp_max_write_wrapper(of, tgt.uclamp_max,
-				nbytes, off);
-			cpu_uclamp_ls_write_u64_wrapper(&cs->css, NULL,
-				tgt.uclamp_latency_sensitive);
-			cpu_uclamp_boost_write_u64_wrapper(&cs->css, NULL,
-				tgt.uclamp_boosted);
+			if (!strcmp(cs_name, tgt.name)) {
+				cpu_uclamp_min_write_wrapper(of, tgt.uclamp_min,
+							nbytes, off);
+				cpu_uclamp_max_write_wrapper(of, tgt.uclamp_max,
+							nbytes, off);
+				cpu_uclamp_ls_write_u64_wrapper(&cs->css, NULL,
+							tgt.uclamp_latency_sensitive);
+				cpu_uclamp_boost_write_u64_wrapper(&cs->css, NULL,
+							tgt.uclamp_boosted);
 
-			break;
+				break;
+			}
 		}
 	}
 }
