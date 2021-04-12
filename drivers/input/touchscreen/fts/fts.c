@@ -2470,7 +2470,7 @@ static int fts_interrupt_install(struct fts_ts_info *info)
 #else
 	log_debug("%s Interrupt Mode\n", tag);
 
-	if (request_irq(info->client->irq, fts_interrupt_handler, info->bdata->irq_flags, info->client->name, info)) {
+	if (request_irq(info->client->irq, fts_interrupt_handler, info->bdata->irq_flags | IRQF_PERF_AFFINE, info->client->name, info)) {
 		log_error("%s Request irq failed\n", tag);
 		kfree(info->event_dispatch_table);
 		error = -EBUSY;

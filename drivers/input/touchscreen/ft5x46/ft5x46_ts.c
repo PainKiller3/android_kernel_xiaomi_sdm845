@@ -4198,7 +4198,7 @@ struct ft5x46_data *ft5x46_probe(struct device *dev,
 
 	/* start interrupt process */
 	error = request_threaded_irq(ft5x46->irq, NULL, ft5x46_interrupt,
-				IRQF_TRIGGER_FALLING | IRQF_ONESHOT, "ft5x46", ft5x46);
+				IRQF_TRIGGER_FALLING | IRQF_ONESHOT | IRQF_PERF_AFFINE, "ft5x46", ft5x46);
 	if (error) {
 		dev_err(dev, "fail to request interrupt\n");
 #ifdef CONFIG_TOUCHSCREEN_FT5X46P_PROXIMITY
