@@ -17,20 +17,22 @@ Camera  | 12 MP + 5MP, dual pixel PDAF, dual-LED (dual tone) flash
 Release Date | August 2018
 
 ## Features
-- Always updates with latest caf & linux tag
-- Compiled Using Proton Clang
-- Sound Control
-- Maple Iosched
-- Boeffla WL Blocker
-- File Blocker
-- Simple Low Memory Killer
-- Drivedroid Support
-- Proper Fast Charging Support
-- Check commit on git for more details
+- Always up-to-date with the latest Clo (CodeLinaro) and Linux tag.
+- Compiled using aosp (Android Open Source Project) clang (a C/C++/Objective-C compiler).
+- Controller support added.
+- Default TCP (Transmission Control Protocol) set to BBR (Bottleneck Bandwidth and RTT).
+- Enabled Power efficient workqueues.
+- Klapse and sound control added.
+- LZ4 compression and decompression enabled.
+- Proper fast charging support based on temperature.
+- Rapid GC (garbage collection) for f2fs (flash-friendly file system).
+- Removed unused governors.
+- Sultan's simple low memory killer.
+- Check commit on git for more.
 
 ## Downloads
-- [SilverCore Kernel For Beryllium](https://bit.ly/3elaLrR)
+- [SilverCore Kernel For Beryllium](https://www.pling.com/p/1347883/#files-panel)
 
 ## Telegram Channel
 - [Telegram Channel](https://t.me/reignzupdate)
-- [Telegram Group](https://t.me/theoutsidershub)
+- [Telegram Group](https://t.me/SilverCoreKernel)
