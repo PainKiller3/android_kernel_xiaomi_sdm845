@@ -1016,7 +1016,7 @@ static int __tcp_transmit_skb(struct sock *sk, struct sk_buff *skb,
 		if (unlikely(!skb))
 			return -ENOBUFS;
 	}
-	skb_mstamp_get(&skb->skb_mstamp);
+		skb->skb_mstamp = tcp_clock_us();
 
 	inet = inet_sk(sk);
 	tcb = TCP_SKB_CB(skb);
@@ -1126,7 +1126,7 @@ static int __tcp_transmit_skb(struct sock *sk, struct sk_buff *skb,
 		err = net_xmit_eval(err);
 	}
 	if (!err && oskb) {
-		skb_mstamp_get(&oskb->skb_mstamp);
+		oskb->skb_mstamp = tcp_clock_us();
 		tcp_rate_skb_sent(sk, oskb);
 	}
 	return err;
@@ -2959,7 +2959,7 @@ int __tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb, int segs)
 		err = nskb ? tcp_transmit_skb(sk, nskb, 0, GFP_ATOMIC) :
 			     -ENOBUFS;
 		if (!err)
-			skb_mstamp_get(&skb->skb_mstamp);
+			skb->skb_mstamp = tcp_clock_us();
 	} else {
 		err = tcp_transmit_skb(sk, skb, 1, GFP_ATOMIC);
 	}
