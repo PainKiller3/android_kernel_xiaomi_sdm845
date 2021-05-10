@@ -2955,6 +2955,7 @@ CONFIG_DRM_BRIDGE=y
 # CONFIG_DRM_ARCPGU is not set
 # CONFIG_DRM_HISI_KIRIN is not set
 # CONFIG_DRM_LEGACY is not set
+CONFIG_KLAPSE=y
 
 #
 # Frame buffer Devices
