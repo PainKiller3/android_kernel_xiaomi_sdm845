@@ -1780,7 +1780,10 @@ static irqreturn_t ft5x46_interrupt(int irq, void *dev_id)
 
 	error = ft5x46_read_touchdata(ft5x46);
 	if (!error) {
+		pm_qos_update_request(&ft5x46->pm_qos_req, 100);
 		ft5x46_report_value(ft5x46);
+		pm_qos_update_request(&ft5x46->pm_qos_req,
+					PM_QOS_DEFAULT_VALUE);
 	}
 
 out:
@@ -4010,6 +4013,8 @@ struct ft5x46_data *ft5x46_probe(struct device *dev,
 	}
 	ft_data = ft5x46;
 	ft5x46->dev  = dev;
+	pm_qos_add_request(&ft5x46->pm_qos_req, PM_QOS_CPU_DMA_LATENCY,
+			PM_QOS_DEFAULT_VALUE);
 	ft5x46->irq  = gpio_to_irq(pdata->irq_gpio);
 	ft5x46->bops = bops;
 	ft5x46->lockdown_info_acquired = false;
@@ -4301,6 +4306,7 @@ err_configure_sleep:
 err_sysfs_create_group:
 	sysfs_remove_group(&dev->kobj, &ft5x46_attr_group);
 err_free_irq:
+	pm_qos_remove_request(&ft5x46->pm_qos_req);
 	free_irq(ft5x46->irq, ft5x46);
 #ifdef CONFIG_TOUCHSCREEN_FT5X46P_PROXIMITY
 err_free_proximity_phys:
@@ -4382,6 +4388,7 @@ void ft5x46_remove(struct ft5x46_data *ft5x46)
 	ft5x46_release_apk_debug_channel(ft5x46);
 #endif
 	sysfs_remove_group(&ft5x46->dev->kobj, &ft5x46_attr_group);
+	pm_qos_remove_request(&ft5x46->pm_qos_req);
 	free_irq(ft5x46->irq, ft5x46);
 #ifdef CONFIG_TOUCHSCREEN_FT5X46P_PROXIMITY
 	kfree(ft5x46->proximity->phys);
