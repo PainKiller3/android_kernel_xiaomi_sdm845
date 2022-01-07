@@ -705,16 +705,25 @@ ARCH_CFLAGS :=
 include arch/$(SRCARCH)/Makefile
 
 ifdef CONFIG_LLVM_POLLY
-KBUILD_CFLAGS	+= -mllvm -polly \
+OPT_FLAGS := -mllvm -polly \
 		   -mllvm -polly-run-dce \
 		   -mllvm -polly-run-inliner \
-		   -mllvm -polly-reschedule=1 \
-		   -mllvm -polly-loopfusion-greedy=1 \
-		   -mllvm -polly-postopts=1 \
 		   -mllvm -polly-ast-use-context \
 		   -mllvm -polly-detect-keep-going \
 		   -mllvm -polly-vectorizer=stripmine \
 		   -mllvm -polly-invariant-load-hoisting
+
+ifeq ($(call clang-ifversion, -ge, 1400, y), y)
+OPT_FLAGS += -mllvm -polly-reschedule=1 \
+	-mllvm -polly-loopfusion-greedy=1 \
+	-mllvm -polly-postopts=1
+else
+OPT_FLAGS += -mllvm -polly-opt-fusion=max
+endif
+
+KBUILD_CFLAGS += $(OPT_FLAGS)
+KBUILD_AFLAGS += $(OPT_FLAGS)
+KBUILD_LDFLAGS += $(OPT_FLAGS)
 endif
 
 KBUILD_CFLAGS	+= $(call cc-option,-fno-delete-null-pointer-checks,)
