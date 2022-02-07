@@ -59,7 +59,6 @@
 		qcom,dispparam-enabled;
 		/* qcom,esd-err-irq-gpio = <&tlmm 52 0>; */
 		qcom,suspend-ulps-enabled;
-		qcom,panel-allow-phy-poweroff;
 		qcom,disp-doze-lpm-backlight = <20>;
 		qcom,disp-doze-hbm-backlight = <266>;
 		qcom,mdss-dsi-display-timings {

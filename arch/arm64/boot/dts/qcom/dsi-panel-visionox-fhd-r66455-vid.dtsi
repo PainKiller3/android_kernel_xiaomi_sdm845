@@ -64,7 +64,6 @@
 
 		qcom,ulps-enabled;
 		qcom,suspend-ulps-enabled;
-		qcom,panel-allow-phy-poweroff;
 
 		qcom,disp-doze-lpm-backlight = <20>;
 		qcom,disp-doze-hbm-backlight = <266>;
