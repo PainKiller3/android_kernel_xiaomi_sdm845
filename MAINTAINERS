@@ -10079,6 +10079,7 @@ F:	drivers/block/brd.c
 
 RANDOM NUMBER DRIVER
 M:	"Theodore Ts'o" <tytso@mit.edu>
+M:	Jason A. Donenfeld <Jason@zx2c4.com>
 S:	Maintained
 F:	drivers/char/random.c
 
@@ -13101,14 +13102,6 @@ F:	include/linux/wimax/debug.h
 F:	include/net/wimax.h
 F:	include/uapi/linux/wimax.h
 F:	net/wimax/
-
-WIREGUARD SECURE NETWORK TUNNEL
-M:	Jason A. Donenfeld <Jason@zx2c4.com>
-S:	Maintained
-F:	drivers/net/wireguard/
-F:	tools/testing/selftests/wireguard/
-L:	wireguard@lists.zx2c4.com
-L:	netdev@vger.kernel.org
 
 WISTRON LAPTOP BUTTON DRIVER
 M:	Miloslav Trmac <mitr@volny.cz>
